@@ -11,7 +11,8 @@ import type { AssetRef } from '@/types/editor'
 
 /**
  * Horizontal filmstrip of the project's screenshots, pinned under the canvas.
- * Ordered smallest → largest so the left-most preview is the lowest res.
+ * Urutan mengikuti urutan import / urutan yang diatur user dengan seretan
+ * (bukan diurutkan otomatis berdasarkan ukuran).
  */
 export function FilmStrip({ projectId }: { projectId: string }) {
   const document = useEditorStore((s) => s.document)
@@ -20,6 +21,7 @@ export function FilmStrip({ projectId }: { projectId: string }) {
   const mutate = useEditorStore((s) => s.mutate)
   const { importFiles, retryUpload } = useAssets(projectId)
   const [dragOver, setDragOver] = useState(false)
+  const [dragId, setDragId] = useState<string | null>(null)
   const fileInput = useRef<HTMLInputElement>(null)
 
   // Filmstrip hanya menampilkan screenshot induk — aset milik layer overlay
@@ -28,9 +30,40 @@ export function FilmStrip({ projectId }: { projectId: string }) {
   for (const l of document.layers) {
     if (l.type === 'image' && l.ownerAssetId) overlayAssetIds.add(l.assetId)
   }
-  const orderedAssets = Object.values(document.assets)
-    .filter((a) => !overlayAssetIds.has(a.id))
-    .sort((a, b) => a.width * a.height - b.width * b.height || a.name.localeCompare(b.name))
+  const orderedAssets = Object.values(document.assets).filter(
+    (a) => !overlayAssetIds.has(a.id),
+  )
+
+  // Seret thumbnail ke thumbnail lain → sisipkan pada posisi itu.
+  // Geser ke kanan: sisipkan sesudah target; geser ke kiri: sebelum target.
+  const dropOn = (targetId: string) => {
+    const fromId = dragId
+    setDragId(null)
+    if (!fromId || fromId === targetId) return
+    mutate((doc) => {
+      const overlays = new Set<string>()
+      for (const l of doc.layers) {
+        if (l.type === 'image' && l.ownerAssetId) overlays.add(l.assetId)
+      }
+      const ids = Object.keys(doc.assets).filter((id) => !overlays.has(id))
+      const from = ids.indexOf(fromId)
+      const to = ids.indexOf(targetId)
+      if (from < 0 || to < 0 || from === to) return
+      ids.splice(from, 1)
+      ids.splice(to, 0, fromId)
+      const rebuilt: typeof doc.assets = {}
+      for (const id of ids) {
+        const asset = doc.assets[id]
+        if (asset) rebuilt[id] = asset
+      }
+      // Aset overlay tidak tampil di strip — sisipkan di belakang, urutannya
+      // tidak berpengaruh ke mana pun.
+      for (const [id, asset] of Object.entries(doc.assets)) {
+        if (!(id in rebuilt)) rebuilt[id] = asset
+      }
+      doc.assets = rebuilt
+    })
+  }
 
   const doImport = async (files: FileList | null) => {
     if (!files || files.length === 0) return
@@ -82,8 +115,12 @@ export function FilmStrip({ projectId }: { projectId: string }) {
         dragOver && 'bg-accent/30 outline-2 -outline-offset-2 outline-dashed outline-accent',
       )}
       onDragOver={(e) => {
-        e.preventDefault()
-        setDragOver(true)
+        // Hanya file (import) yang memicu highlight — seretan internal antar
+        // thumbnail tidak dianggap "jatuhkan file di sini".
+        if (e.dataTransfer.types.includes('Files')) {
+          e.preventDefault()
+          setDragOver(true)
+        }
       }}
       onDragLeave={() => setDragOver(false)}
       onDrop={(e) => {
@@ -103,12 +140,16 @@ export function FilmStrip({ projectId }: { projectId: string }) {
             key={asset.id}
             asset={asset}
             active={activeAssetId === asset.id}
+            beingDragged={dragId === asset.id}
             onActivate={() => {
               setActiveAsset(asset.id)
               useEditorStore.getState().setSelection([])
             }}
             onRemove={() => removeAsset(asset.id)}
             onRetry={() => retryUpload(asset.id)}
+            onDragStart={() => setDragId(asset.id)}
+            onDragEnd={() => setDragId(null)}
+            onDrop={() => dropOn(asset.id)}
           />
         ))}
         <Button
@@ -140,9 +181,13 @@ export function FilmStrip({ projectId }: { projectId: string }) {
 function FilmThumb(props: {
   asset: AssetRef
   active: boolean
+  beingDragged: boolean
   onActivate: () => void
   onRemove: () => void
   onRetry: () => void
+  onDragStart: () => void
+  onDragEnd: () => void
+  onDrop: () => void
 }) {
   const { asset, active } = props
   const [url, setUrl] = useState<string | null>(null)
@@ -168,7 +213,22 @@ function FilmThumb(props: {
         active
           ? 'border-primary ring-2 ring-primary shadow-[0_0_12px_-2px_var(--color-primary)]'
           : 'border-border opacity-80 hover:opacity-100',
+        props.beingDragged && 'opacity-40',
       )}
+      draggable
+      onDragStart={(e) => {
+        // Set data agar drag pasti dimulai di semua browser, dan nonaktifkan
+        // drag natif <img> yang selama ini menelan gesture seretan user.
+        e.dataTransfer.setData('text/plain', asset.id)
+        e.dataTransfer.effectAllowed = 'move'
+        props.onDragStart()
+      }}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault()
+        props.onDrop()
+      }}
+      onDragEnd={props.onDragEnd}
     >
       <button
         type="button"
@@ -178,7 +238,13 @@ function FilmThumb(props: {
         title={`${asset.name} · ${asset.width}×${asset.height}`}
       >
         {url ? (
-          <img src={url} alt={asset.name} className="size-full object-cover" loading="lazy" />
+          <img
+            src={url}
+            alt={asset.name}
+            className="size-full object-cover"
+            loading="lazy"
+            draggable={false}
+          />
         ) : (
           <div className="flex size-full items-center justify-center bg-secondary/60">
             <Loader2 className="size-4 animate-spin text-muted-foreground" />

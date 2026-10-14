@@ -283,29 +283,10 @@ function fitLayerToAspect(layer: ImageLayer, aspect: number) {
 }
 
 /**
- * Keep every image layer inside the canvas: shrink overflowing layers down
- * (contain, aspect preserved) and clamp their position so nothing sticks
- * out past the canvas edges. Mutates in place (use inside mutate).
- */
-export function containImageLayersInCanvas(document: EditorDocument) {
-  const cw = document.canvas.width
-  const ch = document.canvas.height
-  for (const layer of document.layers) {
-    if (layer.type !== 'image') continue
-    const scale = Math.min(1, cw / layer.width, ch / layer.height)
-    if (scale < 1) {
-      layer.width = Math.max(5, layer.width * scale)
-      layer.height = Math.max(5, layer.height * scale)
-    }
-    layer.x = Math.min(Math.max(layer.x, 0), Math.max(0, cw - layer.width))
-    layer.y = Math.min(Math.max(layer.y, 0), Math.max(0, ch - layer.height))
-  }
-}
-
-/**
  * Fit every image layer's box to its effective crop region aspect so the
- * canvas shows a real crop instead of stretching the image into the box,
- * then contain the layers inside the canvas. Mutates in place.
+ * canvas shows a real crop instead of stretching the image into the box.
+ * Ukuran layer TIDAK dipaksa masuk ke dalam canvas — canvas hanya
+ * memotong (clip) bagian yang menonjol. Mutates in place.
  */
 export function refitImageLayers(document: EditorDocument) {
   for (const layer of document.layers) {
@@ -318,5 +299,4 @@ export function refitImageLayers(document: EditorDocument) {
       : asset.width / Math.max(1, asset.height)
     fitLayerToAspect(layer, aspect)
   }
-  containImageLayersInCanvas(document)
 }

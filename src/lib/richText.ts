@@ -14,6 +14,9 @@ export interface CharStyle {
   fill: string
 }
 
+/** Warna otomatis untuk prosa roleplay — baris yang diawali `*`. */
+export const AUTO_PURPLE = '#bc84d1'
+
 export interface RichRun {
   text: string
   /** offset X relatif kiri box text */
@@ -93,16 +96,57 @@ function charStyleAt(base: CharStyle, ranges: TextStyleRange[], index: number): 
   return style
 }
 
+/** Apakah baris tempat karakter `index` berada diawali `*`. */
+function lineHasAsterisk(text: string, index: number): boolean {
+  const lineStart = text.lastIndexOf('\n', index - 1) + 1
+  const lineEnd = text.indexOf('\n', index)
+  const line = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd)
+  return line.trimStart().startsWith('*')
+}
+
+/**
+ * Prosa roleplay: SETIAP baris yang diawali `*` diwarnai ungu otomatis,
+ * baris lain (mis. dialog setelah enter) tetap warna dasar. Override fill
+ * dari user lewat styleRanges menang atas warna otomatis ini.
+ */
+function withAutoLineFill(
+  text: string,
+  ranges: TextStyleRange[],
+  index: number,
+  style: CharStyle,
+): CharStyle {
+  const overridden = ranges.some(
+    (r) => index >= r.start && index < r.end && r.fill !== undefined,
+  )
+  if (overridden || !lineHasAsterisk(text, index)) return style
+  return { ...style, fill: AUTO_PURPLE }
+}
+
+/**
+ * Teks mencampur baris `*` dan baris biasa — warnanya per-baris sehingga
+ * harus dirender lewat jalur rich text, bukan Konva.Text satu-warna.
+ */
+export function hasMixedAutoPurple(text: string): boolean {
+  const lines = text.split('\n').filter((l) => l.trim() !== '')
+  let starred = 0
+  for (const line of lines) if (line.trimStart().startsWith('*')) starred += 1
+  return starred > 0 && starred < lines.length
+}
+
 /**
  * Gaya efektif pada posisi karakter `index` — untuk menampilkan nilai kontrol
  * panel sesuai isi seleksi aktif.
  */
 export function styleAt(
-  layer: Pick<TextLayer, 'fontFamily' | 'fontSize' | 'fontWeight' | 'fontStyle' | 'fill'>,
+  layer: Pick<
+    TextLayer,
+    'fontFamily' | 'fontSize' | 'fontWeight' | 'fontStyle' | 'fill'
+  > & Partial<Pick<TextLayer, 'text'>>,
   ranges: TextStyleRange[],
   index: number,
 ): CharStyle {
-  return charStyleAt(baseStyleOf(layer as TextLayer), ranges, index)
+  const style = charStyleAt(baseStyleOf(layer as TextLayer), ranges, index)
+  return layer.text === undefined ? style : withAutoLineFill(layer.text, ranges, index, style)
 }
 
 /** Gabungkan karakter berurutan bergaya sama menjadi run. Pemecah per karakter '\n'. */
@@ -124,11 +168,9 @@ function segmentize(text: string, base: CharStyle, ranges: TextStyleRange[]): Se
       if (current) {
         current.lineBreakAfter = true
         current = null
-      } else if (segments.length > 0) {
-        const last = segments[segments.length - 1] as Segment
-        last.lineBreakAfter = true
       } else {
-        // baris kosong di awal
+        // Enter beruntun (atau teks diawali enter): tiap baris kosong
+        // jadi segmen sendiri supaya ruang/tingginya ikut terhitung.
         segments.push({ text: '', style: { ...base }, start: i, lineBreakAfter: true })
       }
       prevLineBreak = true
@@ -140,7 +182,7 @@ function segmentize(text: string, base: CharStyle, ranges: TextStyleRange[]): Se
       unit = ch + (text[i + 1] as string)
       i += 1
     }
-    const style = charStyleAt(base, ranges, i)
+    const style = withAutoLineFill(text, ranges, i, charStyleAt(base, ranges, i))
     if (current && !prevLineBreak && sameStyle(current.style, style)) {
       current.text += unit
     } else {
@@ -219,8 +261,9 @@ export function drawRichRuns(
 }
 
 /**
- * Hitung layout multi-style: wrap kata terhadap `boxWidth`, align, lineHeight.
- * `boxWidth` <= 0 dianggap tanpa batas (tidak wrap).
+ * Hitung layout multi-style: teks hanya dipecah oleh enter (`\n`), tanpa
+ * word-wrap — tiap baris memanjang mengikuti konten kalimatnya.
+ * Align dihitung relatif lebar baris terlebar.
  */
 export function layoutRichText(
   layer: Pick<
@@ -234,13 +277,11 @@ export function layoutRichText(
     | 'align'
     | 'lineHeight'
     | 'letterSpacing'
-    | 'width'
   >,
   ranges: TextStyleRange[],
 ): RichLayout {
   const base = baseStyleOf(layer as TextLayer)
   const segments = segmentize(layer.text, base, ranges)
-  const boxWidth = layer.width > 0 ? layer.width : Number.POSITIVE_INFINITY
   const letterSpacing = layer.letterSpacing
   const lineHeightFactor = layer.lineHeight
 
@@ -255,7 +296,9 @@ export function layoutRichText(
   let cursor = 0
 
   const flushLine = () => {
-    if (line.length > 0) lines.push(line)
+    // Baris kosong hasil enter beruntun tetap di-push: array token kosong
+    // nanti dihitung tingginya dari fontSize dasar (ruang kosong valid).
+    lines.push(line)
     line = []
     cursor = 0
   }
@@ -263,42 +306,40 @@ export function layoutRichText(
   for (const segment of segments) {
     for (const token of tokensOf(segment, letterSpacing)) {
       const isSpaces = /^\s+$/.test(token.text)
-      // Bungkus kata berikutnya ke baris baru bila melewati batas.
-      if (!isSpaces && cursor > 0 && cursor + token.width > boxWidth) flushLine()
-      // Spasi di awal baris hasil wrap tidak dirender (mirip word-wrap umum).
+      // Spasi di awal baris tidak dirender (mirip word-wrap umum).
       if (isSpaces && cursor === 0) continue
       line.push({ ...token, x: 0, y: 0, lineHeightPx: 0 })
       cursor += token.width
-      if (cursor > boxWidth && isSpaces) {
-        // spasi panjang di akhir baris dipotong dengan wrap
-        flushLine()
-      }
     }
     if (segment.lineBreakAfter) flushLine()
   }
   if (line.length > 0 || lines.length === 0) flushLine()
 
+  // Pass 1: lebar tiap baris → align dihitung relatif lebar terlebar.
+  const lineWidths = lines.map((tokens) =>
+    tokens.reduce((sum, t) => sum + t.width, 0),
+  )
+  const maxLineWidth = lineWidths.reduce((m, w) => Math.max(m, w), 0)
+
   const runs: RichRun[] = []
-  let maxLineWidth = 0
   let y = 0
-  for (const tokens of lines) {
+  lines.forEach((tokens, index) => {
     const maxSize = tokens.reduce((m, t) => Math.max(m, t.height), base.fontSize)
     const lineHeightPx = maxSize * lineHeightFactor
-    const lineWidth = tokens.reduce((sum, t) => sum + t.width, 0)
+    const lineWidth = lineWidths[index] ?? 0
     const alignOffset =
       layer.align === 'center'
-        ? Math.max(0, (boxWidth === Number.POSITIVE_INFINITY ? 0 : boxWidth - lineWidth) / 2)
+        ? (maxLineWidth - lineWidth) / 2
         : layer.align === 'right'
-          ? Math.max(0, boxWidth === Number.POSITIVE_INFINITY ? 0 : boxWidth - lineWidth)
+          ? maxLineWidth - lineWidth
           : 0
     let x = alignOffset
     for (const token of tokens) {
       runs.push({ text: token.text, x, y, style: token.style })
       x += token.width
     }
-    maxLineWidth = Math.max(maxLineWidth, boxWidth === Number.POSITIVE_INFINITY ? lineWidth : Math.min(lineWidth, boxWidth))
     y += lineHeightPx
-  }
+  })
 
   return { runs, width: maxLineWidth, height: y }
 }

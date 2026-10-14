@@ -10,7 +10,7 @@ import {
 } from '@/lib/images'
 import { defaultCropRule, effectiveCrop, layerVisibleForAsset } from '@/lib/editorDocument'
 import { applyKonvaImageFilter } from '@/lib/imageFilters'
-import { drawRichRuns, layoutRichText } from '@/lib/richText'
+import { drawRichRuns, hasMixedAutoPurple, layoutRichText } from '@/lib/richText'
 import type { CropRule, EditorDocument, ExportDefaults, Layer } from '@/types/editor'
 
 export interface ExportFile {
@@ -127,9 +127,10 @@ async function buildNode(l: Layer, document: EditorDocument): Promise<Konva.Shap
   }
 
   if (l.type === 'text') {
-    // Rich text (styleRanges): layout custom sama seperti node editor.
-    if (l.styleRanges && l.styleRanges.length > 0) {
-      const layout = layoutRichText(l, l.styleRanges)
+    // Rich text (styleRanges) atau warna per-baris (prosa `*`): layout custom
+    // sama seperti node editor.
+    if ((l.styleRanges && l.styleRanges.length > 0) || hasMixedAutoPurple(l.text)) {
+      const layout = layoutRichText(l, l.styleRanges ?? [])
       return new Konva.Shape({
         ...common,
         width: layout.width,
@@ -148,8 +149,12 @@ async function buildNode(l: Layer, document: EditorDocument): Promise<Konva.Shap
         shadowOffsetY: l.shadowOffsetY || undefined,
       })
     }
+    // Teks berukuran otomatis (ikut konten, tanpa word-wrap): jangan kirim
+    // width/height — `undefined` menghapus attr sehingga Konva.Text mode auto.
     return new Konva.Text({
       ...common,
+      width: undefined,
+      height: undefined,
       text: l.text,
       fontFamily: l.fontFamily,
       fontSize: l.fontSize,

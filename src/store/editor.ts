@@ -8,7 +8,10 @@ import {
   type SyncStatus,
   type TextLayer,
 } from '@/types/editor'
-import { containImageLayersInCanvas, createEmptyDocument, layerVisibleForAsset } from '@/lib/editorDocument'
+import { createEmptyDocument, layerVisibleForAsset } from '@/lib/editorDocument'
+import { AUTO_PURPLE } from '@/lib/richText'
+
+export { AUTO_PURPLE }
 
 const HISTORY_LIMIT = 100
 
@@ -79,19 +82,33 @@ function claimUnscopedLayers(doc: EditorDocument, assetId: string | null): boole
   return changed
 }
 
-export const AUTO_PURPLE = '#bc84d1'
 export const DEFAULT_TEXT_FILL = '#ffffff'
 
 function startsWithAsterisk(text: string): boolean {
   return text.trimStart().startsWith('*')
 }
 
-/** Text that starts with `*` is roleplay prose — auto-color it purple. */
+/**
+ * Warna dasar efektif sebuah isi text setelah aturan auto-purple:
+ * - semua baris diawali `*` → ungu penuh;
+ * - campuran prosa `*` + baris biasa → fill sekarang, kecuali masih ungu
+ *   (sisa aturan lama) yang di-reset ke putih agar baris dialog tidak ungu;
+ * - tanpa `*` → fill tidak berubah.
+ * Baris `*` pada teks campuran tetap tampil ungu via renderer per-baris.
+ */
+export function resolveAutoTextFill(text: string, currentFill: string): string {
+  if (!startsWithAsterisk(text)) return currentFill
+  const hasPlainLine = text
+    .split('\n')
+    .some((line) => line.trim() !== '' && !startsWithAsterisk(line))
+  if (!hasPlainLine) return AUTO_PURPLE
+  return currentFill.toLowerCase() === AUTO_PURPLE ? DEFAULT_TEXT_FILL : currentFill
+}
+
+/** Text lines that start with `*` are roleplay prose — auto-color them purple. */
 export function applyAutoTextColors(doc: EditorDocument) {
   for (const layer of doc.layers) {
-    if (layer.type === 'text' && startsWithAsterisk(layer.text)) {
-      layer.fill = AUTO_PURPLE
-    }
+    if (layer.type === 'text') layer.fill = resolveAutoTextFill(layer.text, layer.fill)
   }
 }
 
@@ -111,9 +128,7 @@ export function applyTextStyleToAllImages(doc: EditorDocument, src: TextLayer): 
     layer.fontWeight = src.fontWeight
     layer.fontStyle = src.fontStyle
     layer.fill = srcAutoPurple
-      ? startsWithAsterisk(layer.text)
-        ? AUTO_PURPLE
-        : DEFAULT_TEXT_FILL
+      ? resolveAutoTextFill(layer.text, DEFAULT_TEXT_FILL)
       : src.fill
     layer.lineHeight = src.lineHeight
     layer.letterSpacing = src.letterSpacing
@@ -142,14 +157,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   textSelection: null,
 
   loadDocument: (doc, revision) => {
-    // Heal legacy documents: images must never stick out past the canvas.
-    const contained = cloneDocument(doc)
-    containImageLayersInCanvas(contained)
-    applyAutoTextColors(contained)
+    const loaded = cloneDocument(doc)
+    applyAutoTextColors(loaded)
     // Layer lama tanpa pemilik jadi milik gambar pertama, bukan tampil di semua.
-    claimUnscopedLayers(contained, firstImageAssetId(contained))
+    claimUnscopedLayers(loaded, firstImageAssetId(loaded))
     set({
-      document: contained,
+      document: loaded,
       revision,
       selection: [],
       past: [],
@@ -158,7 +171,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       syncStatus: 'synced',
       zoom: 1,
       stagePos: { x: 0, y: 0 },
-      activeAssetId: firstImageAssetId(contained),
+      activeAssetId: firstImageAssetId(loaded),
       textSelection: null,
     })
   },
@@ -266,8 +279,9 @@ export function newTextLayer(partial: Partial<Extract<Layer, { type: 'text' }>> 
     name: partial.name ?? 'Text',
     x: 100,
     y: 100,
-    width: 400,
-    height: 60,
+    // 0 = auto: ukuran mengikuti konten teks (tanpa word-wrap).
+    width: 0,
+    height: 0,
     rotation: 0,
     opacity: 1,
     visible: true,

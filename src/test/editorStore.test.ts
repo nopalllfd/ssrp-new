@@ -32,6 +32,32 @@ describe('auto purple for asterisk text', () => {
     const layer = useEditorStore.getState().document.layers[0]
     expect(layer?.type === 'text' && layer.fill).toBe('#123456')
   })
+
+  it('teks campuran (* + baris setelah enter) dasarnya tetap putih', () => {
+    useEditorStore.getState().mutate((doc) => {
+      doc.layers.push(
+        newTextLayer({
+          text: '* Darren is waving his hand\nDarren says: Jancok',
+        }),
+      )
+    })
+    const layer = useEditorStore.getState().document.layers[0]
+    // Fill dasar putih; baris * tetap ungu via renderer per-baris.
+    expect(layer?.type === 'text' && layer.fill).toBe(DEFAULT_TEXT_FILL)
+  })
+
+  it('teks campuran yang masih ungu (dokumen lama) di-reset ke putih', () => {
+    useEditorStore.getState().mutate((doc) => {
+      doc.layers.push(
+        newTextLayer({
+          text: '* aksi\n dialog',
+          fill: AUTO_PURPLE,
+        }),
+      )
+    })
+    const layer = useEditorStore.getState().document.layers[0]
+    expect(layer?.type === 'text' && layer.fill).toBe(DEFAULT_TEXT_FILL)
+  })
 })
 
 describe('mutate / undo / redo', () => {

@@ -1,12 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Stage, Layer as KonvaLayerNode, Rect, Text, Transformer, Image as KonvaImage, Line } from 'react-konva'
 import type Konva from 'konva'
-import { useEditorStore, AUTO_PURPLE } from '@/store/editor'
+import { useEditorStore, resolveAutoTextFill } from '@/store/editor'
 import type { Layer } from '@/types/editor'
 import { loadAssetImage } from '@/lib/images'
 import { effectiveCrop, layerVisibleForAsset } from '@/lib/editorDocument'
 import { applyKonvaImageFilter } from '@/lib/imageFilters'
-import { shiftStyleRanges } from '@/lib/richText'
+import { hasMixedAutoPurple, shiftStyleRanges } from '@/lib/richText'
 import { RichTextNode } from './RichTextNode'
 
 const SNAP_DISTANCE = 6
@@ -149,7 +149,8 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
       layer.rotation = node.rotation()
       if (layer.type === 'text') {
         // Glyph Konva.Text mengikuti fontSize, bukan width/height — tanpa ini
-        // drag handle kembali ke ukuran semula begitu dilepas.
+        // drag handle kembali ke ukuran semula begitu dilepas. Ukuran box teks
+        // selalu auto (ikut konten), jadi width/height sengaja TIDAK ditulis.
         layer.fontSize = Math.max(4, layer.fontSize * scaleY)
         if (layer.styleRanges?.length) {
           layer.styleRanges = layer.styleRanges.map((r) =>
@@ -158,9 +159,10 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
               : r,
           )
         }
+      } else {
+        layer.width = Math.max(5, layer.width * scaleX)
+        layer.height = Math.max(5, layer.height * scaleY)
       }
-      layer.width = Math.max(5, layer.width * scaleX)
-      layer.height = Math.max(5, layer.height * scaleY)
     })
     node.scale({ x: 1, y: 1 })
   }
@@ -387,13 +389,15 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
             position: 'absolute',
             left: editingLayer.x * zoom + stagePos.x,
             top: editingLayer.y * zoom + stagePos.y,
-            minWidth: Math.max(120, editingLayer.width * zoom),
+            // Selebar konten kalimat (satu baris per enter), tanpa wrap.
+            width: 'max-content',
             fontSize: editingLayer.fontSize * zoom,
             fontFamily: editingLayer.fontFamily,
             fontWeight: editingLayer.fontWeight,
             fontStyle: editingLayer.fontStyle,
-            // Auto-purple instan: begitu draft diawali `*`, tampil ungu seketika.
-            color: editingDraft.trimStart().startsWith('*') ? AUTO_PURPLE : editingLayer.fill,
+            // Preview ~ hasil akhir: teks campuran dasarnya putih (baris *
+            // ungu hanya tampil setelah commit via renderer per-baris).
+            color: resolveAutoTextFill(editingDraft, editingLayer.fill),
             lineHeight: editingLayer.lineHeight,
             letterSpacing: editingLayer.letterSpacing,
             textAlign: editingLayer.align,
@@ -404,7 +408,7 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
             background: 'transparent',
             border: '1px dashed #4f9cff',
             outline: 'none',
-            resize: 'both',
+            resize: 'none',
             padding: 0,
             margin: 0,
             zIndex: 10,
@@ -462,13 +466,21 @@ function EditorShape(props: {
     )
   }
   if (layer.type === 'text') {
-    // Rich text: gaya per-rangkaian karakter memerlukan renderer kustom.
-    if (layer.styleRanges && layer.styleRanges.length > 0) {
-      return <RichTextNode layer={layer} common={common} registerRef={registerRef} />
+    // Teks berukuran otomatis: ikuti konten (hanya pecah di `\n`), jadi jangan
+    // kirim width/height ke node Konva — prop `undefined` akan menghapus attr
+    // lama sehingga Konva.Text jatuh ke mode auto (tanpa word-wrap).
+    const textCommon = { ...common, width: undefined, height: undefined }
+    // Rich text: gaya per-rangkaian ATAU warna per-baris (prosa `*` di antara
+    // baris biasa) memerlukan renderer kustom, bukan Konva.Text satu-warna.
+    if (
+      (layer.styleRanges && layer.styleRanges.length > 0) ||
+      hasMixedAutoPurple(layer.text)
+    ) {
+      return <RichTextNode layer={layer} common={textCommon} registerRef={registerRef} />
     }
     return (
       <Text
-        {...common}
+        {...textCommon}
         ref={(n) => registerRef(layer.id, n)}
         text={layer.text}
         fontFamily={layer.fontFamily}

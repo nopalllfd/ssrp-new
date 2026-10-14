@@ -1,13 +1,15 @@
 import { describe, expect, it } from 'vitest'
 import {
+  AUTO_PURPLE,
   applyStyleRange,
+  hasMixedAutoPurple,
   layoutRichText,
   normalizeRanges,
   shiftStyleRanges,
   styleAt,
 } from '@/lib/richText'
 import { createEmptyDocument, migrateDocument, parseDocument } from '@/lib/editorDocument'
-import { newTextLayer } from '@/store/editor'
+import { DEFAULT_TEXT_FILL, newTextLayer } from '@/store/editor'
 import type { TextLayer, TextStyleRange } from '@/types/editor'
 
 const base = (overrides: Partial<TextLayer> = {}): TextLayer =>
@@ -133,6 +135,43 @@ describe('styleAt', () => {
   })
 })
 
+describe('auto-purple per baris (prosa * + baris biasa)', () => {
+  const twoLine = '* Darren is waving his hand\nDarren says: Jancok'
+  const secondLineIndex = twoLine.indexOf('Darren says') // baris ke-2
+
+  it('baris diawali * ungu, baris setelah enter tetap dasar', () => {
+    const l = base({ text: twoLine, fill: DEFAULT_TEXT_FILL })
+    expect(styleAt(l, [], 3).fill).toBe(AUTO_PURPLE)
+    expect(styleAt(l, [], secondLineIndex).fill).toBe(DEFAULT_TEXT_FILL)
+  })
+
+  it('layoutRichText memberi run ungu hanya untuk baris *', () => {
+    const l = base({ text: twoLine, width: 1000, fill: DEFAULT_TEXT_FILL })
+    const layout = layoutRichText(l, [])
+    const fills = new Set(layout.runs.map((r) => r.style.fill))
+    expect(fills.has(AUTO_PURPLE)).toBe(true)
+    expect(fills.has(DEFAULT_TEXT_FILL)).toBe(true)
+    // Tidak ada run baris kedua yang berwarna ungu.
+    const secondLineRuns = layout.runs.filter(
+      (r) => r.y > (layout.runs[0]?.y ?? 0),
+    )
+    expect(secondLineRuns.length).toBeGreaterThan(0)
+    for (const run of secondLineRuns) expect(run.style.fill).not.toBe(AUTO_PURPLE)
+  })
+
+  it('override fill user tetap menang atas warna auto', () => {
+    const l = base({ text: twoLine, fill: DEFAULT_TEXT_FILL })
+    const s = styleAt(l, [{ start: 0, end: 5, fill: '#ff0000' }], 3)
+    expect(s.fill).toBe('#ff0000')
+  })
+
+  it('hasMixedAutoPurple deteksi teks campuran', () => {
+    expect(hasMixedAutoPurple(twoLine)).toBe(true)
+    expect(hasMixedAutoPurple('* semua baris\n* juga ungu')).toBe(false)
+    expect(hasMixedAutoPurple('tanpa asterisk\nbaris kedua')).toBe(false)
+  })
+})
+
 describe('layoutRichText', () => {
   it('satu gaya → satu run per baris', () => {
     const l = base({ text: 'abc', width: 1000 })
@@ -149,12 +188,16 @@ describe('layoutRichText', () => {
     expect(layout.runs[1]?.style.fill).toBe('#ff0000')
   })
 
-  it('wrap kata sesuai lebar box', () => {
+  it('tanpa wrap: tetap satu baris walau width kecil', () => {
     // Fallback pengukuran jsdom: 0.6 * fontSize per karakter.
     const l = base({ text: 'aa bb cc', width: 20, fontSize: 10 })
     const layout = layoutRichText(l, [])
     const ys = new Set(layout.runs.map((r) => r.y))
-    expect(ys.size).toBeGreaterThan(1)
+    // Satu baris — teks memanjang mengikuti konten, tak dipatah oleh lebar box.
+    expect(ys.size).toBe(1)
+    // Hanya `\n` yang memecah baris.
+    const withEnter = layoutRichText(base({ text: 'aa bb\ncc', fontSize: 10 }), [])
+    expect(new Set(withEnter.runs.map((r) => r.y)).size).toBe(2)
   })
 
   it('baris baru \\n membentuk baris terpisah', () => {
@@ -162,6 +205,22 @@ describe('layoutRichText', () => {
     const layout = layoutRichText(l, [])
     expect(layout.runs).toHaveLength(2)
     expect(layout.runs[1]?.y).toBeGreaterThan(layout.runs[0]?.y ?? 0)
+  })
+
+  it('enter beruntun menghasilkan baris kosong (ruangnya ikut terhitung)', () => {
+    const l = base({ text: 'a\n\nb', fontSize: 10, lineHeight: 1 })
+    const layout = layoutRichText(l, [])
+    // Dua run ('a', 'b') di y berbeda; baris kosong di antaranya tetap
+    // menambah tinggi: 3 baris × 10px.
+    expect(layout.runs).toHaveLength(2)
+    expect(new Set(layout.runs.map((r) => r.y)).size).toBe(2)
+    expect(layout.height).toBeCloseTo(30, 1)
+    // Teks diawali & diakhiri enter: baris kosong awal/akhir ikut dihitung.
+    const padded = layoutRichText(base({ text: '\na\n', fontSize: 10, lineHeight: 1 }), [])
+    expect(padded.height).toBeCloseTo(30, 1)
+    // Tiga enter beruntun = empat baris.
+    const many = layoutRichText(base({ text: 'a\n\n\n\nb', fontSize: 10, lineHeight: 1 }), [])
+    expect(many.height).toBeCloseTo(50, 1)
   })
 
   it('tinggi baris mengikuti ukuran font terbesar di baris itu', () => {

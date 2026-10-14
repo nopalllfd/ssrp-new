@@ -1,11 +1,7 @@
 import { useState } from 'react'
 import { Images, RotateCcw } from 'lucide-react'
 import { applyTextStyleToAllImages, useEditorStore } from '@/store/editor'
-import {
-  containImageLayersInCanvas,
-  effectiveCrop,
-  refitImageLayers,
-} from '@/lib/editorDocument'
+import { effectiveCrop, refitImageLayers } from '@/lib/editorDocument'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label, Select, Slider, Textarea, Toggle } from '@/components/ui/misc'
@@ -45,8 +41,9 @@ export function PropertiesPanel() {
             value={document.canvas.width}
             onChange={(v) =>
               mutate((doc) => {
+                // Ukuran gambar TIDAK ikut mengecil — canvas hanya memotong
+                // bagian yang menonjol (clip).
                 doc.canvas.width = Math.max(16, Math.round(v))
-                containImageLayersInCanvas(doc)
               }, { coalesce: true })
             }
           />
@@ -56,7 +53,6 @@ export function PropertiesPanel() {
             onChange={(v) =>
               mutate((doc) => {
                 doc.canvas.height = Math.max(16, Math.round(v))
-                containImageLayersInCanvas(doc)
               }, { coalesce: true })
             }
           />
@@ -189,6 +185,8 @@ function TextControls({
   onChange: (fn: (l: Layer) => void, coalesce?: boolean) => void
 }) {
   const textSelection = useEditorStore((s) => s.textSelection)
+  // Draft input angka Line height: field boleh kosong sementara saat diedit.
+  const [lhDraft, setLhDraft] = useState<string | null>(null)
   // Seleksi karakter di editor inline milik layer ini (bila masih valid).
   const sel =
     textSelection && textSelection.layerId === layer.id && textSelection.end > textSelection.start
@@ -222,6 +220,8 @@ function TextControls({
 
   // Nilai tampilan kontrol = gaya efektif pada awal seleksi.
   const shown = hasSel && sel ? styleAt(layer, layer.styleRanges ?? [], sel.start) : null
+  // Line height dibulatkan 2 desimal supaya slider & input angka konsisten.
+  const lh = Math.round(layer.lineHeight * 100) / 100
 
   // Salin seluruh gaya text ini ke SEMUA layer text di semua gambar.
   const applyStyleToAllImages = () => {
@@ -314,24 +314,48 @@ function TextControls({
           </Select>
         </div>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div>
-          <Label>Align</Label>
-          <Select
-            className="mt-1"
-            value={layer.align}
-            onChange={(e) => upd((l) => (l.align = e.target.value as TextLayer['align']), false)}
-          >
-            <option value="left">Left</option>
-            <option value="center">Center</option>
-            <option value="right">Right</option>
-          </Select>
+      <div>
+        <Label>Align</Label>
+        <Select
+          className="mt-1"
+          value={layer.align}
+          onChange={(e) => upd((l) => (l.align = e.target.value as TextLayer['align']), false)}
+        >
+          <option value="left">Left</option>
+          <option value="center">Center</option>
+          <option value="right">Right</option>
+        </Select>
+      </div>
+      <div>
+        <div className="mb-1 flex items-center justify-between">
+          <Label>Line height</Label>
+          <span className="text-xs text-muted-foreground">{lh}</span>
         </div>
-        <NumberField
-          label="Line height"
-          value={layer.lineHeight}
-          onChange={(v) => upd((l) => (l.lineHeight = Math.max(0.5, v)))}
-        />
+        <div className="flex items-center gap-2">
+          <Slider
+            className="flex-1"
+            min={0.5}
+            max={3}
+            step={0.05}
+            value={lh}
+            onChange={(e) => upd((l) => (l.lineHeight = Math.max(0.5, Number(e.target.value))))}
+          />
+          <Input
+            className="w-16 shrink-0"
+            type="number"
+            min={0.5}
+            step={0.05}
+            value={lhDraft ?? String(lh)}
+            onChange={(e) => {
+              const raw = e.target.value
+              setLhDraft(raw)
+              if (raw.trim() === '') return
+              const n = Number(raw)
+              if (Number.isFinite(n)) upd((l) => (l.lineHeight = Math.max(0.5, n)))
+            }}
+            onBlur={() => setLhDraft(null)}
+          />
+        </div>
       </div>
       <ColorField
         label="Color"
