@@ -95,6 +95,7 @@ const textLayerSchema = z.object({
   shadowBlur: z.number().min(0),
   shadowOffsetX: z.number(),
   shadowOffsetY: z.number(),
+  chatlogMargin: z.number().min(0).optional(),
 })
 
 const rectLayerSchema = z.object({

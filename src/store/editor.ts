@@ -10,6 +10,7 @@ import {
 } from '@/types/editor'
 import { createEmptyDocument, layerVisibleForAsset } from '@/lib/editorDocument'
 import { AUTO_PURPLE } from '@/lib/richText'
+import { SHAPE_NAMES } from '@/lib/shapes'
 
 export { AUTO_PURPLE }
 
@@ -30,10 +31,13 @@ export interface EditorState {
   // Seleksi teks aktif di editor inline (textarea). Dipakai PropertiesPanel
   // untuk menerapkan gaya hanya ke rangkaian [start, end) yang diseleksi.
   textSelection: { layerId: string; start: number; end: number } | null
+  // File chatlog yang diunggah di tab Chatlog (null = belum ada).
+  chatlog: ChatlogData | null
 
   // document lifecycle
   loadDocument: (doc: EditorDocument, revision: number | null) => void
   resetDocument: () => void
+  setChatlog: (chatlog: ChatlogData | null) => void
 
   // history-aware mutation entry point
   mutate: (fn: (doc: EditorDocument) => void, options?: { coalesce?: boolean }) => void
@@ -83,6 +87,16 @@ function claimUnscopedLayers(doc: EditorDocument, assetId: string | null): boole
 }
 
 export const DEFAULT_TEXT_FILL = '#ffffff'
+
+/**
+ * Isi file chatlog (.txt) yang sedang diunggah di panel Chatlog.
+ * Hanya state sesi — sengaja tidak disimpan ke dokumen; layer text hasil
+ * automasi-nya sendiri sudah persist sebagai layer biasa.
+ */
+export interface ChatlogData {
+  fileName: string
+  content: string
+}
 
 function startsWithAsterisk(text: string): boolean {
   return text.trimStart().startsWith('*')
@@ -155,6 +169,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   future: [],
   activeAssetId: null,
   textSelection: null,
+  chatlog: null,
 
   loadDocument: (doc, revision) => {
     const loaded = cloneDocument(doc)
@@ -173,6 +188,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       stagePos: { x: 0, y: 0 },
       activeAssetId: firstImageAssetId(loaded),
       textSelection: null,
+      chatlog: null,
     })
   },
 
@@ -187,6 +203,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       syncStatus: 'synced',
       activeAssetId: null,
       textSelection: null,
+      chatlog: null,
     }),
 
   mutate: (fn, options) => {
@@ -244,6 +261,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setZoom: (zoom) => set({ zoom: Math.min(Math.max(zoom, 0.05), 8) }),
   setStagePos: (pos) => set({ stagePos: pos }),
   setTextSelection: (sel) => set({ textSelection: sel }),
+  setChatlog: (chatlog) => set({ chatlog }),
   setActiveAsset: (id) => {
     // Serap layer tanpa pemilik (mis. dibuat sebelum ada gambar) oleh gambar
     // yang baru diaktifkan — tanpa menambah entri history.
@@ -310,7 +328,8 @@ export function newRectLayer(partial: Partial<Extract<Layer, { type: 'rect' }>> 
     id: nanoid(),
     type: 'rect',
     assetId: null,
-    name: partial.name ?? 'Rectangle',
+    shape: partial.shape ?? 'rect',
+    name: partial.name ?? SHAPE_NAMES[partial.shape ?? 'rect'],
     x: 100,
     y: 100,
     width: 240,

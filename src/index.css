@@ -24,6 +24,7 @@
   --radius-lg: 0.625rem;
   --animate-logo-breathe: logo-breathe 1.8s ease-in-out infinite;
   --animate-loading-slide: loading-slide 1.1s ease-in-out infinite;
+  --animate-toast-in: toast-in 0.18s ease-out;
 
   @keyframes logo-breathe {
     0%,
@@ -43,6 +44,17 @@
     }
     100% {
       transform: translateX(400%);
+    }
+  }
+
+  @keyframes toast-in {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
     }
   }
 }

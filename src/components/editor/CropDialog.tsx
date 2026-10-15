@@ -7,6 +7,7 @@ import {
   effectiveCrop,
   refitImageLayers,
 } from '@/lib/editorDocument'
+import { refitChatlogLayers } from '@/lib/chatlog'
 import { loadAssetImage, renderAssetExport, resolveAssetUrl } from '@/lib/images'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -126,6 +127,7 @@ export function CropDialog({
         if (l?.type === 'image') l.cropOverride = structuredClone(rule)
       }
       refitImageLayers(doc)
+      refitChatlogLayers(doc)
     })
     onOpenChange(false)
   }
@@ -137,6 +139,7 @@ export function CropDialog({
       const l = doc.layers.find((x) => x.id === targetId)
       if (l?.type === 'image') l.cropOverride = null
       refitImageLayers(doc)
+      refitChatlogLayers(doc)
     })
     setScope('shared')
     const doc = useEditorStore.getState().document
@@ -149,6 +152,7 @@ export function CropDialog({
       doc.sharedCrop = null
       doc.applySameCropToAll = false
       refitImageLayers(doc)
+      refitChatlogLayers(doc)
     })
     onOpenChange(false)
   }

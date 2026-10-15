@@ -11,7 +11,8 @@ import {
 import { defaultCropRule, effectiveCrop, layerVisibleForAsset } from '@/lib/editorDocument'
 import { applyKonvaImageFilter } from '@/lib/imageFilters'
 import { drawRichRuns, hasMixedAutoPurple, layoutRichText } from '@/lib/richText'
-import type { CropRule, EditorDocument, ExportDefaults, Layer } from '@/types/editor'
+import { drawShapePath } from '@/lib/shapes'
+import type { AssetRef, CropRule, EditorDocument, ExportDefaults, Layer } from '@/types/editor'
 
 export interface ExportFile {
   name: string
@@ -19,7 +20,7 @@ export interface ExportFile {
 }
 
 export interface ExportOptions extends ExportDefaults {
-  /** 'canvas': single composite of all layers. 'assets': one file per image layer with its crop applied. */
+  /** 'canvas': single composite of all layers. 'assets': one file per image layer, resolusi mengikuti canvas dengan crop region-nya diterapkan. */
   mode: 'canvas' | 'assets'
   /** Canvas mode renders exactly what the editor shows: this asset's image + its text/shape layers. */
   activeAssetId?: string | null
@@ -173,12 +174,28 @@ async function buildNode(l: Layer, document: EditorDocument): Promise<Konva.Shap
     })
   }
 
-  return new Konva.Rect({
+  const shapeKind = l.shape ?? 'rect'
+  if (shapeKind === 'rect') {
+    return new Konva.Rect({
+      ...common,
+      fill: l.fill,
+      cornerRadius: l.cornerRadius,
+      stroke: l.stroke || undefined,
+      strokeWidth: l.strokeWidth || undefined,
+    })
+  }
+  // Bentuk selain rect: path sama dengan sceneFunc editor supaya hasil ekspor
+  // identik dengan tampilan canvas.
+  return new Konva.Shape({
     ...common,
     fill: l.fill,
-    cornerRadius: l.cornerRadius,
     stroke: l.stroke || undefined,
     strokeWidth: l.strokeWidth || undefined,
+    selfRectFunc: () => ({ x: 0, y: 0, width: l.width, height: l.height }),
+    sceneFunc: (ctx, shape) => {
+      drawShapePath(ctx._context, shapeKind, l.width, l.height)
+      ctx.fillStrokeShape(shape)
+    },
   })
 }
 
@@ -252,6 +269,20 @@ async function renderAssetComposite(
   }
 }
 
+/**
+ * Crop untuk ekspor per-aset (ZIP): region & fit dari crop efektif layer,
+ * tapi resolusi output mengikuti ukuran canvas — sama dengan ekspor tunggal
+ * (mode canvas). Tanpa crop, region = gambar penuh.
+ */
+export function assetExportCrop(
+  document: EditorDocument,
+  layer: Extract<Layer, { type: 'image' }>,
+  asset: AssetRef,
+): CropRule {
+  const crop = effectiveCrop(layer, document) ?? defaultCropRule(asset.width, asset.height)
+  return { ...crop, outWidth: document.canvas.width, outHeight: document.canvas.height }
+}
+
 /** Produce the full set of files for an export, honoring the chosen mode. */
 export async function buildExportFiles(
   document: EditorDocument,
@@ -277,7 +308,9 @@ export async function buildExportFiles(
   for (const layer of imageLayers) {
     const asset = document.assets[layer.assetId]
     if (!asset) continue
-    const crop = effectiveCrop(layer, document) ?? defaultCropRule(asset.width, asset.height)
+    // Resolusi mengikuti canvas (bukan resolusi asli gambar) supaya konsisten
+    // dengan ekspor tunggal dan hasil crop yang sudah diatur user.
+    const crop = assetExportCrop(document, layer, asset)
     const canvas = await renderAssetComposite(document, layer, crop)
     const blob = await canvasToBlob(canvas, options.format, options.quality, options.background)
     files.push({ name: exportFileName(options.prefix, index, options.format), blob })

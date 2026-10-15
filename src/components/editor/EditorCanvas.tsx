@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Stage, Layer as KonvaLayerNode, Rect, Text, Transformer, Image as KonvaImage, Line } from 'react-konva'
+import { Stage, Layer as KonvaLayerNode, Rect, Text, Transformer, Image as KonvaImage, Line, Shape } from 'react-konva'
 import type Konva from 'konva'
 import { useEditorStore, resolveAutoTextFill } from '@/store/editor'
 import type { Layer } from '@/types/editor'
@@ -7,6 +7,7 @@ import { loadAssetImage } from '@/lib/images'
 import { effectiveCrop, layerVisibleForAsset } from '@/lib/editorDocument'
 import { applyKonvaImageFilter } from '@/lib/imageFilters'
 import { hasMixedAutoPurple, shiftStyleRanges } from '@/lib/richText'
+import { drawShapePath } from '@/lib/shapes'
 import { RichTextNode } from './RichTextNode'
 
 const SNAP_DISTANCE = 6
@@ -500,14 +501,35 @@ function EditorShape(props: {
       />
     )
   }
+  const shapeKind = layer.shape ?? 'rect'
+  if (shapeKind === 'rect') {
+    return (
+      <Rect
+        {...common}
+        ref={(n) => registerRef(layer.id, n)}
+        fill={layer.fill}
+        cornerRadius={layer.cornerRadius}
+        stroke={layer.stroke || undefined}
+        strokeWidth={layer.strokeWidth || undefined}
+      />
+    )
+  }
+  // Bentuk selain rect digambar via sceneFunc kustom (path sama dengan exporter);
+  // tanpa hitFunc, area klik = persis bentuk yang tergambar (fill).
   return (
-    <Rect
+    <Shape
       {...common}
       ref={(n) => registerRef(layer.id, n)}
+      width={layer.width}
+      height={layer.height}
+      selfRectFunc={() => ({ x: 0, y: 0, width: layer.width, height: layer.height })}
       fill={layer.fill}
-      cornerRadius={layer.cornerRadius}
       stroke={layer.stroke || undefined}
       strokeWidth={layer.strokeWidth || undefined}
+      sceneFunc={(ctx, shape) => {
+        drawShapePath(ctx._context, shapeKind, layer.width, layer.height)
+        ctx.fillStrokeShape(shape)
+      }}
     />
   )
 }

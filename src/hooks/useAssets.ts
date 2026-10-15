@@ -16,6 +16,7 @@ import {
 import { useEditorStore } from '@/store/editor'
 import { newImageLayer } from '@/store/editor'
 import { defaultCropRule } from '@/lib/editorDocument'
+import { toast } from '@/components/ui/toast'
 import type { AssetRef } from '@/types/editor'
 
 const ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/gif']
@@ -211,6 +212,27 @@ export function useAssets(projectId: string) {
         useEditorStore.getState().setSelection([])
       }
       void pumpQueue()
+
+      // Beri notifikasi bila ada file yang ditolak (format tak didukung,
+      // korup, kegedean, atau duplikat) — selama ini hasilnya dibuang diam-diam.
+      const first = rejected[0]
+      if (rejected.length === 1 && first) {
+        const title = /unsupported|corrupt|failed to read/i.test(first.reason)
+          ? 'Unsupported file'
+          : /exceeds/i.test(first.reason)
+            ? 'File too large'
+            : /duplicate/i.test(first.reason)
+              ? 'Duplicate file'
+              : 'Import failed'
+        toast({ title, description: `${first.name} — ${first.reason}`, variant: 'destructive' })
+      } else if (rejected.length > 1) {
+        toast({
+          title: `${rejected.length} files not imported`,
+          description: rejected.map((r) => `${r.name} — ${r.reason}`).join('\n'),
+          variant: 'destructive',
+        })
+      }
+
       return { imported, rejected }
     },
     [projectId, pumpQueue],

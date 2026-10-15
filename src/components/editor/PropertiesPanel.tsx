@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Images, RotateCcw } from 'lucide-react'
 import { applyTextStyleToAllImages, useEditorStore } from '@/store/editor'
 import { effectiveCrop, refitImageLayers } from '@/lib/editorDocument'
+import { refitChatlogLayers } from '@/lib/chatlog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label, Select, Slider, Textarea, Toggle } from '@/components/ui/misc'
@@ -44,6 +45,7 @@ export function PropertiesPanel() {
                 // Ukuran gambar TIDAK ikut mengecil — canvas hanya memotong
                 // bagian yang menonjol (clip).
                 doc.canvas.width = Math.max(16, Math.round(v))
+                refitChatlogLayers(doc)
               }, { coalesce: true })
             }
           />
@@ -53,6 +55,7 @@ export function PropertiesPanel() {
             onChange={(v) =>
               mutate((doc) => {
                 doc.canvas.height = Math.max(16, Math.round(v))
+                refitChatlogLayers(doc)
               }, { coalesce: true })
             }
           />
@@ -73,6 +76,7 @@ export function PropertiesPanel() {
               mutate((doc) => {
                 doc.applySameCropToAll = v
                 refitImageLayers(doc)
+                refitChatlogLayers(doc)
               })
             }
             label="Apply same crop to all"
@@ -158,15 +162,17 @@ export function PropertiesPanel() {
               })
             }
           />
-          <NumberField
-            label="Corner radius"
-            value={first.cornerRadius}
-            onChange={(v) =>
-              updateLayers((l) => {
-                if (l.type === 'rect') l.cornerRadius = Math.max(0, v)
-              }, true)
-            }
-          />
+          {(first.shape ?? 'rect') === 'rect' && (
+            <NumberField
+              label="Corner radius"
+              value={first.cornerRadius}
+              onChange={(v) =>
+                updateLayers((l) => {
+                  if (l.type === 'rect') l.cornerRadius = Math.max(0, v)
+                }, true)
+              }
+            />
+          )}
         </>
       )}
 

@@ -125,12 +125,22 @@ export interface TextLayer extends BaseLayer {
   shadowBlur: number
   shadowOffsetX: number
   shadowOffsetY: number
+  /**
+   * Khusus layer chatlog: jarak margin (px) dari tepi area gambar yang
+   * terlihat — dipakai untuk memposisikan ulang setelah crop/canvas berubah.
+   */
+  chatlogMargin?: number
 }
+
+/** Bentuk visual untuk layer rect. Dokumen lama tanpa field ini = 'rect'. */
+export type ShapeKind = 'rect' | 'ellipse' | 'triangle' | 'diamond'
 
 export interface RectLayer extends BaseLayer {
   type: 'rect'
   /** Image this layer belongs to. Null = created without an active image (legacy docs). */
   assetId: string | null
+  /** Jenis bentuk yang digambar; absen pada dokumen lama = rectangle. */
+  shape?: ShapeKind
   fill: string
   cornerRadius: number
   stroke: string

@@ -1,7 +1,10 @@
 import { useEffect, useState } from 'react'
 import {
   ArrowLeft,
+  ChevronDown,
+  Circle,
   Crop,
+  Diamond,
   Download,
   History,
   LayoutTemplate,
@@ -12,6 +15,7 @@ import {
   Save,
   SlidersHorizontal,
   Square,
+  Triangle,
   Type,
   Undo2,
 } from 'lucide-react'
@@ -19,7 +23,16 @@ import { useEditorStore } from '@/store/editor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/misc'
-import type { SyncStatus } from '@/types/editor'
+import { Dropdown, DropdownItem } from '@/components/ui/dropdown'
+import { SHAPE_KINDS, SHAPE_NAMES } from '@/lib/shapes'
+import type { ShapeKind, SyncStatus } from '@/types/editor'
+
+const SHAPE_ICONS: Record<ShapeKind, typeof Square> = {
+  rect: Square,
+  ellipse: Circle,
+  triangle: Triangle,
+  diamond: Diamond,
+}
 
 const SYNC_LABEL: Record<SyncStatus, { label: string; className: string }> = {
   synced: { label: 'Synced', className: 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' },
@@ -41,7 +54,7 @@ export function EditorToolbar({
   onZoomFit,
   onZoomReset,
   onAddText,
-  onAddRect,
+  onAddShape,
   onOpenCrop,
   onOpenFilter,
   onOpenTemplates,
@@ -55,7 +68,7 @@ export function EditorToolbar({
   onZoomFit: () => void
   onZoomReset: () => void
   onAddText: () => void
-  onAddRect: () => void
+  onAddShape: (shape: ShapeKind) => void
   onOpenCrop: () => void
   onOpenFilter: () => void
   onOpenTemplates: () => void
@@ -153,9 +166,22 @@ export function EditorToolbar({
       <Button variant="ghost" size="sm" onClick={onAddText}>
         <Type /> <span className="hidden md:inline">Text</span>
       </Button>
-      <Button variant="ghost" size="sm" onClick={onAddRect}>
-        <Square /> <span className="hidden md:inline">Rect</span>
-      </Button>
+      <Dropdown
+        trigger={
+          <Button variant="ghost" size="sm">
+            <Square /> <span className="hidden md:inline">Shape</span> <ChevronDown />
+          </Button>
+        }
+      >
+        {SHAPE_KINDS.map((kind) => {
+          const Icon = SHAPE_ICONS[kind]
+          return (
+            <DropdownItem key={kind} onClick={() => onAddShape(kind)}>
+              <Icon /> {SHAPE_NAMES[kind]}
+            </DropdownItem>
+          )
+        })}
+      </Dropdown>
       <Button variant="ghost" size="sm" onClick={onOpenCrop} disabled={!hasImages}>
         <Crop /> <span className="hidden md:inline">Crop</span>
       </Button>

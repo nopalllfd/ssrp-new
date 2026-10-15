@@ -10,7 +10,7 @@ import { EditorCanvas } from '@/components/editor/EditorCanvas'
 import { FilmStrip } from '@/components/editor/FilmStrip'
 import { ToolsPanel } from '@/components/editor/ToolsPanel'
 import { LayersPanel } from '@/components/editor/LayersPanel'
-import { PropertiesPanel } from '@/components/editor/PropertiesPanel'
+import { RightPanel } from '@/components/editor/RightPanel'
 import { CropDialog } from '@/components/editor/CropDialog'
 import { ImageFilterDialog } from '@/components/editor/ImageFilterDialog'
 import { TemplatesDialog } from '@/components/editor/TemplatesDialog'
@@ -242,7 +242,7 @@ export function EditorPage() {
         onZoomFit={zoomFit}
         onZoomReset={() => useEditorStore.getState().setZoom(1)}
         onAddText={() => addLayer(newTextLayer())}
-        onAddRect={() => addLayer(newRectLayer())}
+        onAddShape={(shape) => addLayer(newRectLayer({ shape }))}
         onOpenCrop={() => setDialog('crop')}
         onOpenFilter={() => setDialog('filter')}
         onOpenTemplates={() => setDialog('templates')}
@@ -300,8 +300,10 @@ export function EditorPage() {
           <FilmStrip projectId={pid} />
         </main>
 
-        <aside className="hidden w-80 shrink-0 overflow-y-auto border-l border-border bg-card lg:block">
-          <PropertiesPanel />
+        {/* gutter stabil: lebar konten tidak mengecil saat scrollbar muncul
+            (mis. saat memilih layer chatlog → panel Properties jadi tinggi). */}
+        <aside className="app-scrollbar hidden w-80 shrink-0 overflow-y-auto [scrollbar-gutter:stable] border-l border-border bg-card lg:block">
+          <RightPanel />
         </aside>
       </div>
 
@@ -320,7 +322,7 @@ export function EditorPage() {
             className="absolute inset-0 bg-black/60"
             onClick={() => setPanelsOpen(false)}
           />
-          <div className="absolute inset-y-0 left-0 flex w-80 max-w-[85vw] flex-col overflow-y-auto border-r border-border bg-card">
+          <div className="app-scrollbar absolute inset-y-0 left-0 flex w-80 max-w-[85vw] flex-col overflow-y-auto [scrollbar-gutter:stable] border-r border-border bg-card">
             <div className="flex items-center justify-between border-b border-border px-3 py-2">
               <span className="text-sm font-semibold">Panels</span>
               <button
@@ -334,7 +336,7 @@ export function EditorPage() {
             </div>
             <ToolsPanel />
             <LayersPanel projectId={pid} />
-            <PropertiesPanel />
+            <RightPanel />
           </div>
         </div>
       )}

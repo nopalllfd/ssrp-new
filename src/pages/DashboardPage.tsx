@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -12,6 +12,7 @@ import {
   Pencil,
   RotateCcw,
   Search,
+  Sparkles,
   Trash2,
   User as UserIcon,
 } from 'lucide-react'
@@ -197,6 +198,25 @@ export function DashboardPage() {
         <Toggle checked={showTrash} onChange={setShowTrash} label="Trash" />
       </div>
 
+      {/* Kartu tools */}
+      {!showTrash && (
+        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <button
+            type="button"
+            onClick={() => navigate('/ai-chatlog')}
+            className="group rounded-lg border border-border bg-card p-4 text-left transition-colors hover:bg-accent/60"
+          >
+            <span className="mb-2 flex size-9 items-center justify-center rounded-md bg-secondary text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
+              <Sparkles className="size-4" />
+            </span>
+            <p className="text-sm font-medium">AI Chatlog Tools</p>
+            <p className="text-xs text-muted-foreground">
+              Clean, filter, and extract RP chatlogs with AI.
+            </p>
+          </button>
+        </div>
+      )}
+
       {projectsQuery.isLoading && (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
           {Array.from({ length: 4 }).map((_, i) => (
@@ -249,11 +269,13 @@ export function DashboardPage() {
       )}
 
       {visible.length > 0 && view === 'list' && (
-        <div className="overflow-hidden rounded-lg border border-border">
+        // Tanpa overflow-hidden — agar menu dropdown baris terakhir tidak
+        // terpotong. Sudut membulat diserahkan ke baris pertama/terakhir.
+        <div className="rounded-lg border border-border">
           {visible.map((p) => (
             <div
               key={p.id}
-              className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-b-0 hover:bg-accent/40"
+              className="flex items-center justify-between gap-3 border-b border-border px-4 py-3 last:border-b-0 first:rounded-t-lg last:rounded-b-lg hover:bg-accent/40"
             >
               <button
                 type="button"
@@ -364,11 +386,17 @@ export function DashboardPage() {
  * Ambil gambar (screenshot) pertama proyek sebagai thumbnail kartu dashboard.
  * Mengabaikan layer gambar overlay (ownerAssetId) dan layer tersembunyi.
  */
-function useProjectThumbnail(projectId: string, enabled: boolean): string | null {
+function useProjectThumbnail(
+  projectId: string,
+  enabled: boolean,
+): { url: string | null; onImgError: () => void } {
+  const queryClient = useQueryClient()
   const query = useQuery({
     queryKey: ['project-thumb', projectId],
     enabled,
-    staleTime: 10 * 60 * 1000,
+    // Lebih singkat dari masa berlaku signed URL (10 menit) supaya URL yang
+    // sudah kedaluwarsa tidak dipakai ulang dari cache.
+    staleTime: 5 * 60 * 1000,
     queryFn: async (): Promise<string | null> => {
       const state = await getProjectState(projectId)
       if (!state) return null
@@ -385,13 +413,37 @@ function useProjectThumbnail(projectId: string, enabled: boolean): string | null
     },
   })
   const url = query.data ?? null
-  // Lepaskan blob URL sesi agar tidak bocor memori.
+
+  // Revoke HANYA ketika URL diganti oleh data query baru — jangan saat
+  // unmount. Selama URL masih tersimpan di cache query, ia akan dipakai lagi
+  // saat kartu dirender ulang (toggle grid/list, buka-tutup trash, navigasi);
+  // kalau sudah direvoke saat unmount, gambarnya gagal load dan thumbnail
+  // jadi "hilang-muncul".
+  const prevUrl = useRef<string | null>(null)
   useEffect(() => {
-    return () => {
-      if (url && url.startsWith('blob:')) URL.revokeObjectURL(url)
-    }
+    const prev = prevUrl.current
+    prevUrl.current = url
+    if (prev && prev !== url && prev.startsWith('blob:')) URL.revokeObjectURL(prev)
   }, [url])
-  return url
+
+  // Jika <img> gagal load (mis. signed URL kedaluwarsa atau blob sempat
+  // dilepas), minta URL baru — maksimal 2 kali supaya tidak loop; kalau tetap
+  // gagal, URL ditandai broken dan kartu menampilkan placeholder.
+  const [brokenUrl, setBrokenUrl] = useState<string | null>(null)
+  const triedUrl = useRef<string | null>(null)
+  const retries = useRef(0)
+  const onImgError = useCallback(() => {
+    if (!url) return
+    if (triedUrl.current === url || retries.current >= 2) {
+      setBrokenUrl(url)
+      return
+    }
+    triedUrl.current = url
+    retries.current += 1
+    void queryClient.invalidateQueries({ queryKey: ['project-thumb', projectId] })
+  }, [queryClient, projectId, url])
+
+  return { url: url && brokenUrl !== url ? url : null, onImgError }
 }
 
 function ProjectCard(props: {
@@ -405,17 +457,25 @@ function ProjectCard(props: {
   onPurge: () => void
 }) {
   const { project, trashed, onOpen } = props
-  const thumbUrl = useProjectThumbnail(project.id, !trashed)
+  const { url: thumbUrl, onImgError } = useProjectThumbnail(project.id, !trashed)
   return (
-    <div className="group overflow-hidden rounded-lg border border-border bg-card">
+    // Jangan pakai overflow-hidden di card: ia ikut memotong menu dropdown
+    // (position absolute) yang keluar ke bawah card. Sudut membulat diserahkan
+    // ke thumbnail di bawah ini.
+    <div className="group rounded-lg border border-border bg-card">
       <button
         type="button"
         onClick={() => !trashed && onOpen()}
-        className="block h-24 w-full cursor-pointer overflow-hidden bg-secondary/60"
+        className="block h-24 w-full cursor-pointer overflow-hidden rounded-t-lg bg-secondary/60"
         aria-label={`Open ${project.name}`}
       >
         {thumbUrl ? (
-          <img src={thumbUrl} alt="" className="h-full w-full object-cover" />
+          <img
+            src={thumbUrl}
+            alt=""
+            className="h-full w-full object-cover"
+            onError={onImgError}
+          />
         ) : (
           <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
             No thumbnail

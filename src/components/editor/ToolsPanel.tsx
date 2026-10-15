@@ -3,10 +3,8 @@ import {
   ArrowDownRight,
   ArrowUpLeft,
   ArrowUpRight,
-  Square,
-  Type,
 } from 'lucide-react'
-import { newRectLayer, newTextLayer, useEditorStore } from '@/store/editor'
+import { newTextLayer, useEditorStore } from '@/store/editor'
 import { layerVisibleForAsset } from '@/lib/editorDocument'
 import { Button } from '@/components/ui/button'
 import type { EditorDocument, Layer } from '@/types/editor'
@@ -36,22 +34,6 @@ export function ToolsPanel() {
   const mutate = useEditorStore((s) => s.mutate)
   const setSelection = useEditorStore((s) => s.setSelection)
 
-  const addText = () => {
-    const layer = newTextLayer({ assetId: useEditorStore.getState().activeAssetId })
-    mutate((doc) => {
-      doc.layers.push(layer)
-    })
-    setSelection([layer.id])
-  }
-
-  const addRect = () => {
-    const layer = newRectLayer({ assetId: useEditorStore.getState().activeAssetId })
-    mutate((doc) => {
-      doc.layers.push(layer)
-    })
-    setSelection([layer.id])
-  }
-
   const applyCorner = (corner: Corner) => {
     const { selection, activeAssetId: active } = useEditorStore.getState()
     let createdId: string | null = null
@@ -80,20 +62,6 @@ export function ToolsPanel() {
 
   return (
     <div className="flex flex-col gap-4 border-b border-border p-3">
-      <section>
-        <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
-          Tambah
-        </h3>
-        <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" size="sm" onClick={addText}>
-            <Type /> Text
-          </Button>
-          <Button variant="outline" size="sm" onClick={addRect}>
-            <Square /> Shape
-          </Button>
-        </div>
-      </section>
-
       <section>
         <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
           Template posisi text

@@ -8,7 +8,9 @@ import { AuthCallbackPage } from '@/pages/AuthCallbackPage'
 import { DashboardPage } from '@/pages/DashboardPage'
 import { EditorPage } from '@/pages/EditorPage'
 import { ProfilePage } from '@/pages/ProfilePage'
+import { AiChatlogPage } from '@/pages/AiChatlogPage'
 import { LoadingScreen } from '@/components/ui/misc'
+import { Toaster } from '@/components/ui/toast'
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -108,8 +110,17 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            <Route
+              path="/ai-chatlog"
+              element={
+                <ProtectedRoute>
+                  <AiChatlogPage />
+                </ProtectedRoute>
+              }
+            />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            <Toaster />
           </MobileGate>
         </BrowserRouter>
       </AuthProvider>
