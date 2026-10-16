@@ -7,7 +7,6 @@ import {
   Diamond,
   Download,
   History,
-  LayoutTemplate,
   Maximize,
   Minus,
   Plus,
@@ -57,7 +56,6 @@ export function EditorToolbar({
   onAddShape,
   onOpenCrop,
   onOpenFilter,
-  onOpenTemplates,
   onOpenHistory,
   onOpenExport,
 }: {
@@ -71,7 +69,6 @@ export function EditorToolbar({
   onAddShape: (shape: ShapeKind) => void
   onOpenCrop: () => void
   onOpenFilter: () => void
-  onOpenTemplates: () => void
   onOpenHistory: () => void
   onOpenExport: () => void
 }) {
@@ -89,125 +86,152 @@ export function EditorToolbar({
   const [name, setName] = useState(projectName)
   useEffect(() => setName(projectName), [projectName])
 
+  // Mobile: toolbar disusun per baris — baris edit & baris aksi bisa dilipat
+  // supaya tidak memakan layar. Di layar besar (sm+) semua selalu terbuka.
+  const [editOpen, setEditOpen] = useState(true)
+  const [actionsOpen, setActionsOpen] = useState(true)
+
   const sync = SYNC_LABEL[syncStatus]
 
-  return (
-    <header className="flex shrink-0 flex-wrap items-center gap-1 border-b border-border bg-card px-2 py-1.5">
-      <Button variant="ghost" size="icon" aria-label="Back to dashboard" onClick={onBack}>
-        <ArrowLeft />
-      </Button>
+  const collapseToggle = (open: boolean, onToggle: () => void, label: string) => (
+    <button
+      type="button"
+      aria-expanded={open}
+      aria-label={`${open ? 'Sembunyikan' : 'Tampilkan'} ${label}`}
+      className="flex h-9 shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-xs font-medium text-muted-foreground hover:bg-accent sm:hidden"
+      onClick={onToggle}
+    >
+      <ChevronDown className={`size-4 transition-transform ${open ? '' : '-rotate-90'}`} />
+      {label}
+    </button>
+  )
 
-      {editingName ? (
-        <Input
-          autoFocus
-          value={name}
-          className="h-8 w-48 text-sm"
-          onChange={(e) => setName(e.target.value)}
-          onBlur={() => {
-            setEditingName(false)
-            const trimmed = name.trim()
-            if (trimmed && trimmed !== projectName) onRename(trimmed)
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-            if (e.key === 'Escape') {
-              setName(projectName)
+  return (
+    <header className="flex shrink-0 flex-col gap-1 border-b border-border bg-card px-2 py-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-1">
+      {/* Baris judul: back, nama project, status sync, undo/redo */}
+      <div className="flex items-center gap-1">
+        <Button variant="ghost" size="icon" aria-label="Back to dashboard" onClick={onBack}>
+          <ArrowLeft />
+        </Button>
+
+        {editingName ? (
+          <Input
+            autoFocus
+            value={name}
+            className="h-8 w-48 text-sm"
+            onChange={(e) => setName(e.target.value)}
+            onBlur={() => {
               setEditingName(false)
-            }
-          }}
-        />
-      ) : (
+              const trimmed = name.trim()
+              if (trimmed && trimmed !== projectName) onRename(trimmed)
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+              if (e.key === 'Escape') {
+                setName(projectName)
+                setEditingName(false)
+              }
+            }}
+          />
+        ) : (
+          <button
+            type="button"
+            className="max-w-56 cursor-text truncate rounded-md px-2 py-1 text-sm font-semibold hover:bg-accent"
+            title="Click to rename"
+            onClick={() => setEditingName(true)}
+          >
+            {projectName}
+          </button>
+        )}
+
+        <Badge className={sync.className}>{sync.label}</Badge>
+
+        <div className="ml-auto flex items-center gap-1">
+          <Button variant="ghost" size="icon" aria-label="Undo" disabled={!canUndo} onClick={undo}>
+            <Undo2 />
+          </Button>
+          <Button variant="ghost" size="icon" aria-label="Redo" disabled={!canRedo} onClick={redo}>
+            <Redo2 />
+          </Button>
+        </div>
+      </div>
+
+      {/* Baris 1: zoom in / zoom out */}
+      <div className="flex items-center gap-1">
+        <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+
+        <Button variant="ghost" size="icon" aria-label="Zoom out" onClick={() => setZoom(zoom / 1.2)}>
+          <Minus />
+        </Button>
+        <span className="w-10 text-center text-xs text-muted-foreground tabular-nums sm:w-12">
+          {Math.round(zoom * 100)}%
+        </span>
+        <Button variant="ghost" size="icon" aria-label="Zoom in" onClick={() => setZoom(zoom * 1.2)}>
+          <Plus />
+        </Button>
+        <Button variant="ghost" size="icon" aria-label="Fit to screen" onClick={onZoomFit}>
+          <Maximize />
+        </Button>
         <button
           type="button"
-          className="max-w-56 cursor-text truncate rounded-md px-2 py-1 text-sm font-semibold hover:bg-accent"
-          title="Click to rename"
-          onClick={() => setEditingName(true)}
+          className="hidden cursor-pointer rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-accent sm:block"
+          onClick={onZoomReset}
+          title="Reset zoom to 100%"
         >
-          {projectName}
+          1:1
         </button>
-      )}
+      </div>
 
-      <Badge className={sync.className}>{sync.label}</Badge>
+      {/* Baris 2: tools edit (bisa dilipat di mobile) */}
+      <div className="flex items-center gap-1">
+        <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+        {collapseToggle(editOpen, () => setEditOpen((v) => !v), 'Edit')}
 
-      <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
-
-      <Button variant="ghost" size="icon" aria-label="Undo" disabled={!canUndo} onClick={undo}>
-        <Undo2 />
-      </Button>
-      <Button variant="ghost" size="icon" aria-label="Redo" disabled={!canRedo} onClick={redo}>
-        <Redo2 />
-      </Button>
-
-      <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
-
-      <Button variant="ghost" size="icon" aria-label="Zoom out" onClick={() => setZoom(zoom / 1.2)}>
-        <Minus />
-      </Button>
-      <span className="w-10 text-center text-xs text-muted-foreground tabular-nums sm:w-12">
-        {Math.round(zoom * 100)}%
-      </span>
-      <Button variant="ghost" size="icon" aria-label="Zoom in" onClick={() => setZoom(zoom * 1.2)}>
-        <Plus />
-      </Button>
-      <Button
-        variant="ghost"
-        size="icon"
-        aria-label="Fit to screen"
-        className="hidden sm:inline-flex"
-        onClick={onZoomFit}
-      >
-        <Maximize />
-      </Button>
-      <button
-        type="button"
-        className="hidden cursor-pointer rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-accent sm:block"
-        onClick={onZoomReset}
-        title="Reset zoom to 100%"
-      >
-        1:1
-      </button>
-
-      <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
-
-      <Button variant="ghost" size="sm" onClick={onAddText}>
-        <Type /> <span className="hidden md:inline">Text</span>
-      </Button>
-      <Dropdown
-        trigger={
-          <Button variant="ghost" size="sm">
-            <Square /> <span className="hidden md:inline">Shape</span> <ChevronDown />
+        <div className={`items-center gap-1 ${editOpen ? 'flex' : 'hidden sm:flex'}`}>
+          <Button variant="ghost" size="sm" onClick={onAddText}>
+            <Type /> <span className="hidden md:inline">Text</span>
           </Button>
-        }
-      >
-        {SHAPE_KINDS.map((kind) => {
-          const Icon = SHAPE_ICONS[kind]
-          return (
-            <DropdownItem key={kind} onClick={() => onAddShape(kind)}>
-              <Icon /> {SHAPE_NAMES[kind]}
-            </DropdownItem>
-          )
-        })}
-      </Dropdown>
-      <Button variant="ghost" size="sm" onClick={onOpenCrop} disabled={!hasImages}>
-        <Crop /> <span className="hidden md:inline">Crop</span>
-      </Button>
-      <Button variant="ghost" size="sm" onClick={onOpenFilter} disabled={!hasImages}>
-        <SlidersHorizontal /> <span className="hidden md:inline">Filter</span>
-      </Button>
+          <Dropdown
+            trigger={
+              <Button variant="ghost" size="sm">
+                <Square /> <span className="hidden md:inline">Shape</span> <ChevronDown />
+              </Button>
+            }
+          >
+            {SHAPE_KINDS.map((kind) => {
+              const Icon = SHAPE_ICONS[kind]
+              return (
+                <DropdownItem key={kind} onClick={() => onAddShape(kind)}>
+                  <Icon /> {SHAPE_NAMES[kind]}
+                </DropdownItem>
+              )
+            })}
+          </Dropdown>
+          <Button variant="ghost" size="sm" onClick={onOpenCrop} disabled={!hasImages}>
+            <Crop /> <span className="hidden md:inline">Crop</span>
+          </Button>
+          <Button variant="ghost" size="sm" onClick={onOpenFilter} disabled={!hasImages}>
+            <SlidersHorizontal /> <span className="hidden md:inline">Filter</span>
+          </Button>
+        </div>
+      </div>
 
-      <div className="ml-auto flex items-center gap-1">
-        <Button variant="ghost" size="icon" aria-label="Save now" onClick={onSaveNow} disabled={!dirty}>
-          <Save />
-        </Button>
-        <Button variant="outline" size="sm" onClick={onOpenTemplates}>
-          <LayoutTemplate /> <span className="hidden lg:inline">Templates</span>
-        </Button>
-        <Button variant="outline" size="sm" onClick={onOpenHistory}>
-          <History /> <span className="hidden lg:inline">History</span>
-        </Button>
-        <Button size="sm" aria-label="Export" onClick={onOpenExport}>
-          <Download /> <span className="hidden sm:inline">Export</span>
-        </Button>
+      {/* Baris 3: save / history / export (bisa dilipat di mobile) */}
+      <div className="flex items-center gap-1 sm:ml-auto">
+        <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
+        {collapseToggle(actionsOpen, () => setActionsOpen((v) => !v), 'File')}
+
+        <div className={`items-center gap-1 ${actionsOpen ? 'flex' : 'hidden sm:flex'}`}>
+          <Button variant="ghost" size="icon" aria-label="Save now" onClick={onSaveNow} disabled={!dirty}>
+            <Save />
+          </Button>
+          <Button variant="outline" size="sm" onClick={onOpenHistory}>
+            <History /> <span className="hidden lg:inline">History</span>
+          </Button>
+          <Button size="sm" aria-label="Export" onClick={onOpenExport}>
+            <Download /> <span className="hidden sm:inline">Export</span>
+          </Button>
+        </div>
       </div>
     </header>
   )

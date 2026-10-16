@@ -13,7 +13,6 @@ import { LayersPanel } from '@/components/editor/LayersPanel'
 import { RightPanel } from '@/components/editor/RightPanel'
 import { CropDialog } from '@/components/editor/CropDialog'
 import { ImageFilterDialog } from '@/components/editor/ImageFilterDialog'
-import { TemplatesDialog } from '@/components/editor/TemplatesDialog'
 import { VersionHistoryDialog } from '@/components/editor/VersionHistoryDialog'
 import { ExportDialog } from '@/components/editor/ExportDialog'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
@@ -21,7 +20,7 @@ import { Button } from '@/components/ui/button'
 import { LoadingScreen } from '@/components/ui/misc'
 import type { Layer } from '@/types/editor'
 
-type EditorDialog = 'crop' | 'filter' | 'templates' | 'history' | 'export'
+type EditorDialog = 'crop' | 'filter' | 'history' | 'export'
 
 export function EditorPage() {
   const { projectId } = useParams<{ projectId: string }>()
@@ -252,7 +251,6 @@ export function EditorPage() {
         onAddShape={(shape) => addLayer(newRectLayer({ shape }))}
         onOpenCrop={() => setDialog('crop')}
         onOpenFilter={() => setDialog('filter')}
-        onOpenTemplates={() => setDialog('templates')}
         onOpenHistory={() => setDialog('history')}
         onOpenExport={() => setDialog('export')}
       />
@@ -352,10 +350,6 @@ export function EditorPage() {
       <ImageFilterDialog
         open={dialog === 'filter'}
         onOpenChange={(o) => setDialog(o ? 'filter' : null)}
-      />
-      <TemplatesDialog
-        open={dialog === 'templates'}
-        onOpenChange={(o) => setDialog(o ? 'templates' : null)}
       />
       <VersionHistoryDialog
         open={dialog === 'history'}

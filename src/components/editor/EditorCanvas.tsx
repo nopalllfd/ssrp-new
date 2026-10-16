@@ -248,24 +248,52 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
     }
   }
 
-  // Touch: single finger drags objects; two-finger pan/zoom is handled by
-  // Konva's touch events mapped onto zoom state below.
-  const touchState = useRef<{ dist: number; zoom: number } | null>(null)
+  // Touch: single finger drags objects; two fingers pinch to zoom & pan.
+  // Zoom di-anchor ke titik tengah dua jari (seperti onWheel) dan stagePos
+  // mengikuti gerakan midpoint — tanpa ini, pinch terasa "lompat" dan screen
+  // sulit diatur di HP.
+  const touchState = useRef<{
+    dist: number
+    zoom: number
+    mid: { x: number; y: number }
+    stage: { x: number; y: number }
+  } | null>(null)
   const onTouchMove = (e: Konva.KonvaEventObject<TouchEvent>) => {
     const touches = e.evt.touches
-    if (touches.length === 2) {
-      e.evt.preventDefault()
-      const t1 = touches[0] as Touch
-      const t2 = touches[1] as Touch
-      const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
-      if (!touchState.current) {
-        touchState.current = { dist, zoom }
-      } else {
-        const factor = dist / touchState.current.dist
-        const newZoom = Math.min(Math.max(touchState.current.zoom * factor, 0.05), 8)
-        setZoom(newZoom)
-      }
+    if (touches.length !== 2) return
+    e.evt.preventDefault()
+    const stage = stageRef.current
+    if (!stage) return
+    // Dua jari = gesture zoom/pan, bukan drag stage.
+    stage.stopDrag()
+    const t1 = touches[0] as Touch
+    const t2 = touches[1] as Touch
+    const dist = Math.hypot(t2.clientX - t1.clientX, t2.clientY - t1.clientY)
+    const box = stage.container().getBoundingClientRect()
+    const mid = {
+      x: (t1.clientX + t2.clientX) / 2 - box.left,
+      y: (t1.clientY + t2.clientY) / 2 - box.top,
     }
+    if (!touchState.current) {
+      // Baca store langsung: stopDrag() bisa saja baru memicu onDragEnd
+      // yang memperbarui stagePos.
+      const s = useEditorStore.getState()
+      touchState.current = {
+        dist,
+        zoom: s.zoom,
+        mid,
+        stage: { x: s.stagePos.x, y: s.stagePos.y },
+      }
+      return
+    }
+    const st = touchState.current
+    const newZoom = Math.min(Math.max(st.zoom * (dist / st.dist), 0.05), 8)
+    // Titik dokumen di bawah midpoint awal harus tetap mengikuti midpoint —
+    // sekaligus memberikan pan saat dua jari digeser.
+    const wx = (st.mid.x - st.stage.x) / st.zoom
+    const wy = (st.mid.y - st.stage.y) / st.zoom
+    setZoom(newZoom)
+    setStagePos({ x: mid.x - wx * newZoom, y: mid.y - wy * newZoom })
   }
   const onTouchEnd = () => {
     touchState.current = null
@@ -292,18 +320,16 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
       }}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
-      style={{ background: '#0a0a0a' }}
+      // touch-action none: serahkan gesture sentuh penuh ke Konva agar
+      // pinch zoom/pan tidak berebut dengan scroll/zoom browser di HP.
+      style={{ background: '#0a0a0a', touchAction: 'none' }}
     >
-      {/* Content layer: clipped to the canvas rect so anything that overhangs
-          an edge is visually cut off instead of spilling out. */}
-      <KonvaLayerNode
-        ref={layerNodeRef}
-        listening
-        clipX={0}
-        clipY={0}
-        clipWidth={document.canvas.width}
-        clipHeight={document.canvas.height}
-      >
+      {/* Content layer: sengaja TANPA clip. Clip memblokir hit test di luar
+          rect canvas, sehingga gambar yang tidak sengaja tergeser keluar jadi
+          tak bisa dipilih/di-drag lagi. Objek yang menjorok kini tetap terlihat
+          & bisa ditarik kembali; hasil export tetap rapi karena exporter
+          merender dengan stage seukuran canvas. */}
+      <KonvaLayerNode ref={layerNodeRef} listening>
         <Rect
           name="canvas-bg"
           x={0}
