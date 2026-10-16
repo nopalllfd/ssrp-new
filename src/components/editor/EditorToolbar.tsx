@@ -86,25 +86,7 @@ export function EditorToolbar({
   const [name, setName] = useState(projectName)
   useEffect(() => setName(projectName), [projectName])
 
-  // Mobile: toolbar disusun per baris — baris edit & baris aksi bisa dilipat
-  // supaya tidak memakan layar. Di layar besar (sm+) semua selalu terbuka.
-  const [editOpen, setEditOpen] = useState(true)
-  const [actionsOpen, setActionsOpen] = useState(true)
-
   const sync = SYNC_LABEL[syncStatus]
-
-  const collapseToggle = (open: boolean, onToggle: () => void, label: string) => (
-    <button
-      type="button"
-      aria-expanded={open}
-      aria-label={`${open ? 'Sembunyikan' : 'Tampilkan'} ${label}`}
-      className="flex h-9 shrink-0 cursor-pointer items-center gap-1 rounded-md px-1.5 text-xs font-medium text-muted-foreground hover:bg-accent sm:hidden"
-      onClick={onToggle}
-    >
-      <ChevronDown className={`size-4 transition-transform ${open ? '' : '-rotate-90'}`} />
-      {label}
-    </button>
-  )
 
   return (
     <header className="flex shrink-0 flex-col gap-1 border-b border-border bg-card px-2 py-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-1">
@@ -182,56 +164,50 @@ export function EditorToolbar({
         </button>
       </div>
 
-      {/* Baris 2: tools edit (bisa dilipat di mobile) */}
+      {/* Baris 2: tools edit */}
       <div className="flex items-center gap-1">
         <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
-        {collapseToggle(editOpen, () => setEditOpen((v) => !v), 'Edit')}
 
-        <div className={`items-center gap-1 ${editOpen ? 'flex' : 'hidden sm:flex'}`}>
-          <Button variant="ghost" size="sm" onClick={onAddText}>
-            <Type /> <span className="hidden md:inline">Text</span>
-          </Button>
-          <Dropdown
-            trigger={
-              <Button variant="ghost" size="sm">
-                <Square /> <span className="hidden md:inline">Shape</span> <ChevronDown />
-              </Button>
-            }
-          >
-            {SHAPE_KINDS.map((kind) => {
-              const Icon = SHAPE_ICONS[kind]
-              return (
-                <DropdownItem key={kind} onClick={() => onAddShape(kind)}>
-                  <Icon /> {SHAPE_NAMES[kind]}
-                </DropdownItem>
-              )
-            })}
-          </Dropdown>
-          <Button variant="ghost" size="sm" onClick={onOpenCrop} disabled={!hasImages}>
-            <Crop /> <span className="hidden md:inline">Crop</span>
-          </Button>
-          <Button variant="ghost" size="sm" onClick={onOpenFilter} disabled={!hasImages}>
-            <SlidersHorizontal /> <span className="hidden md:inline">Filter</span>
-          </Button>
-        </div>
+        <Button variant="ghost" size="sm" onClick={onAddText}>
+          <Type /> <span className="hidden md:inline">Text</span>
+        </Button>
+        <Dropdown
+          trigger={
+            <Button variant="ghost" size="sm">
+              <Square /> <span className="hidden md:inline">Shape</span> <ChevronDown />
+            </Button>
+          }
+        >
+          {SHAPE_KINDS.map((kind) => {
+            const Icon = SHAPE_ICONS[kind]
+            return (
+              <DropdownItem key={kind} onClick={() => onAddShape(kind)}>
+                <Icon /> {SHAPE_NAMES[kind]}
+              </DropdownItem>
+            )
+          })}
+        </Dropdown>
+        <Button variant="ghost" size="sm" onClick={onOpenCrop} disabled={!hasImages}>
+          <Crop /> <span className="hidden md:inline">Crop</span>
+        </Button>
+        <Button variant="ghost" size="sm" onClick={onOpenFilter} disabled={!hasImages}>
+          <SlidersHorizontal /> <span className="hidden md:inline">Filter</span>
+        </Button>
       </div>
 
-      {/* Baris 3: save / history / export (bisa dilipat di mobile) */}
+      {/* Baris 3: save / history / export */}
       <div className="flex items-center gap-1 sm:ml-auto">
         <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
-        {collapseToggle(actionsOpen, () => setActionsOpen((v) => !v), 'File')}
 
-        <div className={`items-center gap-1 ${actionsOpen ? 'flex' : 'hidden sm:flex'}`}>
-          <Button variant="ghost" size="icon" aria-label="Save now" onClick={onSaveNow} disabled={!dirty}>
-            <Save />
-          </Button>
-          <Button variant="outline" size="sm" onClick={onOpenHistory}>
-            <History /> <span className="hidden lg:inline">History</span>
-          </Button>
-          <Button size="sm" aria-label="Export" onClick={onOpenExport}>
-            <Download /> <span className="hidden sm:inline">Export</span>
-          </Button>
-        </div>
+        <Button variant="ghost" size="icon" aria-label="Save now" onClick={onSaveNow} disabled={!dirty}>
+          <Save />
+        </Button>
+        <Button variant="outline" size="sm" onClick={onOpenHistory}>
+          <History /> <span className="hidden lg:inline">History</span>
+        </Button>
+        <Button size="sm" aria-label="Export" onClick={onOpenExport}>
+          <Download /> <span className="hidden sm:inline">Export</span>
+        </Button>
       </div>
     </header>
   )

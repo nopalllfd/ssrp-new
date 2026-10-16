@@ -299,6 +299,15 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
     touchState.current = null
   }
 
+  // Viewport stage (area terlihat) dalam koordinat world — dasar 4 rect mask
+  // yang menutup area luar canvas di layer overlay.
+  const vx = -stagePos.x / zoom
+  const vy = -stagePos.y / zoom
+  const vw = width / zoom
+  const vh = height / zoom
+  const cw = document.canvas.width
+  const ch = document.canvas.height
+
   return (
     <div className="relative" style={{ width, height, overflow: 'hidden' }}>
       <Stage
@@ -324,11 +333,11 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
       // pinch zoom/pan tidak berebut dengan scroll/zoom browser di HP.
       style={{ background: '#0a0a0a', touchAction: 'none' }}
     >
-      {/* Content layer: sengaja TANPA clip. Clip memblokir hit test di luar
-          rect canvas, sehingga gambar yang tidak sengaja tergeser keluar jadi
-          tak bisa dipilih/di-drag lagi. Objek yang menjorok kini tetap terlihat
-          & bisa ditarik kembali; hasil export tetap rapi karena exporter
-          merender dengan stage seukuran canvas. */}
+      {/* Content layer: sengaja TANPA clip. Clip Konva diterapkan juga ke hit
+          test (drawHit), sehingga objek yang menjorok keluar canvas jadi tak
+          bisa dipilih/di-drag. Agar visual tetap terpotong, area luar canvas
+          ditutup mask di layer overlay (lihat di bawah); bagian objek yang
+          masih berada di dalam canvas tetap bisa diklik & ditarik kembali. */}
       <KonvaLayerNode ref={layerNodeRef} listening>
         <Rect
           name="canvas-bg"
@@ -367,9 +376,21 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
             />
           ))}
       </KonvaLayerNode>
-      {/* Overlay layer: unclipped, so transformer handles and snap guides stay
-          usable even when a layer pokes past the canvas edge. */}
+      {/* Overlay layer: guides, transformer, DAN mask tepi canvas. */}
       <KonvaLayerNode>
+        {/* Mask 4 rect (atas/bawah/kiri/kanan): menutup seluruh viewport di
+            luar rect canvas sehingga objek yang menjorok tampak TERPOTONG
+            persis seperti clip — tanpa memasang clip di content layer (clip
+            Konva juga memblokir hit test). Sengaja listening aktif: klik di
+            area gelap tertangkap mask (name canvas-bg → clear selection + stage
+            tetap bisa di-drag) dan tidak menembus ke objek di bawahnya; bagian
+            objek yang masih di dalam canvas tetap bisa diklik/di-drag. Sebagai
+            anak pertama, guides/Transformer di atasnya — handle yang menjorok
+            keluar tetap bisa dipegang. */}
+        <Rect name="canvas-bg" x={vx} y={vy} width={vw} height={Math.max(0, -vy)} fill="#0a0a0a" />
+        <Rect name="canvas-bg" x={vx} y={ch} width={vw} height={Math.max(0, vy + vh - ch)} fill="#0a0a0a" />
+        <Rect name="canvas-bg" x={vx} y={vy} width={Math.max(0, -vx)} height={vh} fill="#0a0a0a" />
+        <Rect name="canvas-bg" x={cw} y={vy} width={Math.max(0, vx + vw - cw)} height={vh} fill="#0a0a0a" />
         {guides.v.map((x) => (
           <Line key={`v${x}`} points={[x, -20, x, document.canvas.height + 20]} stroke="#4f9cff" strokeWidth={1} dash={[4, 4]} listening={false} />
         ))}
