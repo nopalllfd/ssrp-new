@@ -143,18 +143,24 @@ export function EditorToolbar({
       <Button variant="ghost" size="icon" aria-label="Zoom out" onClick={() => setZoom(zoom / 1.2)}>
         <Minus />
       </Button>
-      <span className="w-12 text-center text-xs text-muted-foreground tabular-nums">
+      <span className="w-10 text-center text-xs text-muted-foreground tabular-nums sm:w-12">
         {Math.round(zoom * 100)}%
       </span>
       <Button variant="ghost" size="icon" aria-label="Zoom in" onClick={() => setZoom(zoom * 1.2)}>
         <Plus />
       </Button>
-      <Button variant="ghost" size="icon" aria-label="Fit to screen" onClick={onZoomFit}>
+      <Button
+        variant="ghost"
+        size="icon"
+        aria-label="Fit to screen"
+        className="hidden sm:inline-flex"
+        onClick={onZoomFit}
+      >
         <Maximize />
       </Button>
       <button
         type="button"
-        className="cursor-pointer rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-accent"
+        className="hidden cursor-pointer rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-accent sm:block"
         onClick={onZoomReset}
         title="Reset zoom to 100%"
       >
@@ -199,8 +205,8 @@ export function EditorToolbar({
         <Button variant="outline" size="sm" onClick={onOpenHistory}>
           <History /> <span className="hidden lg:inline">History</span>
         </Button>
-        <Button size="sm" onClick={onOpenExport}>
-          <Download /> Export
+        <Button size="sm" aria-label="Export" onClick={onOpenExport}>
+          <Download /> <span className="hidden sm:inline">Export</span>
         </Button>
       </div>
     </header>

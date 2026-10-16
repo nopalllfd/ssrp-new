@@ -132,7 +132,7 @@ export function FilmStrip({ projectId }: { projectId: string }) {
       <div className="flex items-stretch gap-2 overflow-x-auto p-2">
         {orderedAssets.length === 0 && (
           <p className="self-center px-2 text-xs text-muted-foreground">
-            Belum ada screenshot — jatuhkan file di sini atau klik tombol import.
+            Belum ada screenshot — klik tombol Import atau seret file gambar ke sini.
           </p>
         )}
         {orderedAssets.map((asset) => (
@@ -277,9 +277,9 @@ function FilmThumb(props: {
         type="button"
         aria-label={`Delete ${asset.name}`}
         onClick={props.onRemove}
-        className="absolute top-0.5 right-0.5 hidden cursor-pointer rounded-sm bg-black/70 p-0.5 text-white group-hover:block"
+        className="absolute top-0.5 right-0.5 flex cursor-pointer rounded-sm bg-black/70 p-1 text-white sm:opacity-0 sm:group-hover:opacity-100 sm:focus-visible:opacity-100"
       >
-        <Trash2 className="size-3" />
+        <Trash2 className="size-3.5" />
       </button>
     </div>
   )

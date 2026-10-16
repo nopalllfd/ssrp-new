@@ -35,7 +35,12 @@ export function EditorPage() {
   const [conflict, setConflict] = useState<{
     resolve: (choice: 'reload' | 'keep-local') => void
   } | null>(null)
-  const [panelsOpen, setPanelsOpen] = useState(false)
+  // Drawer mobile terbuka otomatis saat project baru dibuka di layar kecil
+  // (sinkron dengan breakpoint md:hidden pada drawer). Setelah ditutup user,
+  // tetap tertutup sampai pindah project.
+  const [panelsOpen, setPanelsOpen] = useState(
+    () => window.matchMedia('(max-width: 767.98px)').matches,
+  )
   const [canvasDragOver, setCanvasDragOver] = useState(false)
 
   const { loadProject, saveNow, saveManualSnapshot } = usePersistence(pid, (resolve) =>
@@ -233,7 +238,9 @@ export function EditorPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden">
+    // h-dvh: tinggi viewport dinamis — di mobile, address bar yang menyusut
+    // tidak membuat area editor terpotong / menghasilkan scroll ganda.
+    <div className="flex h-dvh flex-col overflow-hidden">
       <EditorToolbar
         projectName={projectName}
         onRename={(name) => void onRename(name)}

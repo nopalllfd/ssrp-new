@@ -126,7 +126,8 @@ export function Toggle({
       disabled={disabled}
       onClick={() => onChange(!checked)}
       className={cn(
-        'inline-flex cursor-pointer items-center gap-2 text-xs text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
+        // min-h-9: area tap lebih nyaman di mobile; kembali compact di ≥sm.
+        'inline-flex min-h-9 cursor-pointer items-center gap-2 text-xs text-muted-foreground sm:min-h-0 disabled:cursor-not-allowed disabled:opacity-50',
       )}
     >
       <span

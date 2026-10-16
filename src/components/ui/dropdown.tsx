@@ -22,10 +22,12 @@ export function Dropdown({ trigger, children, align = 'left' }: {
     const onKey = (e: KeyboardEvent) => {
       if (e.key === 'Escape') setOpen(false)
     }
-    document.addEventListener('mousedown', onClick)
+    // pointerdown (bukan mousedown) agar outside-click juga andal saat
+    // disentuh di perangkat mobile.
+    document.addEventListener('pointerdown', onClick)
     document.addEventListener('keydown', onKey)
     return () => {
-      document.removeEventListener('mousedown', onClick)
+      document.removeEventListener('pointerdown', onClick)
       document.removeEventListener('keydown', onKey)
     }
   }, [open])

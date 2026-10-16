@@ -18,10 +18,11 @@ const variantClasses: Record<Variant, string> = {
 }
 
 const sizeClasses: Record<Size, string> = {
-  sm: 'h-8 px-3 text-xs',
+  sm: 'h-8 min-h-9 px-3 text-xs sm:min-h-0',
   md: 'h-9 px-4 text-sm',
   lg: 'h-10 px-6 text-sm',
-  icon: 'h-8 w-8',
+  // Di mobile target sentuh lebih besar (36px); desktop tetap compact.
+  icon: 'h-9 w-9 sm:h-8 sm:w-8',
 }
 
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(

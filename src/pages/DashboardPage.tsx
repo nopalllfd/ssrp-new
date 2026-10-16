@@ -130,25 +130,26 @@ export function DashboardPage() {
 
   return (
     <div className="mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-6">
-      <header className="mb-6 flex items-center justify-between gap-4">
+      <header className="mb-6 flex items-center justify-between gap-2 sm:gap-4">
         <div className="flex items-center gap-2">
           <img src={logoUrl} alt="Logo Yurchat" className="size-8 rounded-md" />
           <h1 className="text-xl font-semibold">Yurchat</h1>
-          <span className="rounded-full border border-border bg-accent/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+          <span className="hidden rounded-full border border-border bg-accent/60 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-muted-foreground sm:inline">
             Beta Release 1.0.0
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1 sm:gap-2">
           <a
             href="https://bagibagi.co/floppp"
             target="_blank"
             rel="noopener noreferrer"
+            aria-label="Support developer"
             className="flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1.5 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
           >
             <Heart className="size-3.5 text-red-500" />
-            Support developer
+            <span className="hidden md:inline">Support developer</span>
           </a>
-          <Link to="/profile" className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent">
+          <Link to="/profile" className="flex items-center gap-2 rounded-md px-2 py-1 hover:bg-accent" aria-label="Profile">
             {avatarUrl ? (
               <img src={avatarUrl} alt="" className="size-7 rounded-full" referrerPolicy="no-referrer" />
             ) : (
@@ -178,7 +179,7 @@ export function DashboardPage() {
           />
         </div>
         <Select
-          className="w-40"
+          className="w-32 sm:w-40"
           value={sort}
           onChange={(e) => setSort(e.target.value as SortKey)}
           aria-label="Sort projects"
@@ -232,7 +233,7 @@ export function DashboardPage() {
       )}
 
       {projectsQuery.data && visible.length === 0 && (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border p-12 text-center">
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border p-8 text-center sm:p-12">
           <p className="text-lg font-medium">{showTrash ? 'Trash is empty' : 'No projects yet'}</p>
           {!showTrash && (
             <>
