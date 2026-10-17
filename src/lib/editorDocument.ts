@@ -101,6 +101,8 @@ const textLayerSchema = z.object({
 const rectLayerSchema = z.object({
   ...baseLayer,
   type: z.literal('rect'),
+  // Opsional — dokumen lama tanpa field ini tetap valid (default 'rect').
+  shape: z.enum(['rect', 'ellipse', 'triangle', 'diamond']).optional(),
   assetId: z.string().min(1).nullable(),
   fill: z.string(),
   cornerRadius: z.number().min(0),

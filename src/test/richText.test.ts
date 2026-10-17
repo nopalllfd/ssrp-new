@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AUTO_PURPLE,
   applyStyleRange,
+  autoWrapText,
   hasMixedAutoPurple,
   layoutRichText,
   normalizeRanges,
@@ -14,6 +15,36 @@ import type { TextLayer, TextStyleRange } from '@/types/editor'
 
 const base = (overrides: Partial<TextLayer> = {}): TextLayer =>
   newTextLayer({ text: 'halo dunia', ...overrides }) as TextLayer
+
+describe('autoWrapText', () => {
+  it('tidak mengubah text yang masih muat di maxWidth', () => {
+    expect(autoWrapText('halo dunia', base(), 4000)).toBe('halo dunia')
+  })
+
+  it('memecah baris panjang: .... di ujung baris lama & awal baris baru', () => {
+    // fontSize 32 → 1 char ± 19,2px; maxWidth 200 hanya muat ±10 char.
+    const next = autoWrapText('ini adalah kalimat yang sangat panjang sekali', base(), 200)
+    const lines = next.split('\n')
+    expect(lines.length).toBeGreaterThan(1)
+    expect(lines[0]).toMatch(/\.\.\.\.$/)
+    expect(lines[1]?.startsWith('.... ')).toBe(true)
+    // Kata tidak ada yang hilang — hanya dipecah.
+    expect(next.replace(/\.\.\.\./g, '').split(/\s+/).join(' ')).toBe(
+      'ini adalah kalimat yang sangat panjang sekali',
+    )
+  })
+
+  it('menghormati newline eksplisit & membungkus tiap baris terpisah', () => {
+    const next = autoWrapText('pendek\nini baris yang juga panjang dan melebihi batas', base(), 200)
+    const lines = next.split('\n')
+    expect(lines[0]).toBe('pendek')
+    expect(lines.length).toBeGreaterThan(2)
+  })
+
+  it('maxWidth tak wajar (0/negatif) dibiarkan utuh', () => {
+    expect(autoWrapText('satu dua tiga', base(), 0)).toBe('satu dua tiga')
+  })
+})
 
 describe('shiftStyleRanges', () => {
   const ranges: TextStyleRange[] = [{ start: 0, end: 4, fill: '#ff0000' }]

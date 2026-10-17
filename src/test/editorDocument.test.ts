@@ -11,7 +11,7 @@ import {
 } from '@/lib/editorDocument'
 import { EDITOR_SCHEMA_VERSION, type EditorDocument } from '@/types/editor'
 import { DEFAULT_IMAGE_FILTER, isNeutralFilter } from '@/lib/imageFilters'
-import { newImageLayer, newTextLayer } from '@/store/editor'
+import { newImageLayer, newRectLayer, newTextLayer } from '@/store/editor'
 
 describe('createEmptyDocument', () => {
   it('produces a schema-valid document', () => {
@@ -105,6 +105,26 @@ describe('parseDocument', () => {
     expect(isNeutralFilter({ ...DEFAULT_IMAGE_FILTER })).toBe(true)
     expect(isNeutralFilter({ ...DEFAULT_IMAGE_FILTER, blur: 2 })).toBe(false)
     expect(isNeutralFilter({ ...DEFAULT_IMAGE_FILTER, grayscale: 0.5 })).toBe(false)
+  })
+
+  it('keeps the shape kind of rect layers across parse (bug: all shapes reset to rect)', () => {
+    const doc = createEmptyDocument()
+    const rect = newRectLayer({ shape: 'ellipse' })
+    expect(rect).toMatchObject({ type: 'rect', shape: 'ellipse' })
+    doc.layers.push(rect)
+    const result = parseDocument(doc)
+    expect(result.ok).toBe(true)
+    const parsed = result.ok ? result.document.layers[0] : undefined
+    if (parsed?.type !== 'rect') expect.fail('layer pertama harus tetap rect')
+    expect(parsed.shape).toBe('ellipse')
+  })
+
+  it('rejects an unknown shape kind', () => {
+    const doc = createEmptyDocument()
+    // Sengaja loloskan nilai asing via cast — parseDocument (zod) wajib menolak.
+    const bad = { ...newRectLayer(), shape: 'star' } as unknown as EditorDocument['layers'][number]
+    doc.layers.push(bad)
+    expect(parseDocument(doc).ok).toBe(false)
   })
 })
 

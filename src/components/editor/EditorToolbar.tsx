@@ -14,6 +14,7 @@ import {
   Save,
   SlidersHorizontal,
   Square,
+  Trash2,
   Triangle,
   Type,
   Undo2,
@@ -23,6 +24,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/misc'
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown'
+import { deleteLayers } from '@/hooks/useAssets'
 import { SHAPE_KINDS, SHAPE_NAMES } from '@/lib/shapes'
 import type { ShapeKind, SyncStatus } from '@/types/editor'
 
@@ -81,6 +83,7 @@ export function EditorToolbar({
   const redo = useEditorStore((s) => s.redo)
   const dirty = useEditorStore((s) => s.dirty)
   const hasImages = useEditorStore((s) => s.document.layers.some((l) => l.type === 'image'))
+  const selection = useEditorStore((s) => s.selection)
 
   const [editingName, setEditingName] = useState(false)
   const [name, setName] = useState(projectName)
@@ -211,6 +214,17 @@ export function EditorToolbar({
           disabled={!hasImages}
         >
           <SlidersHorizontal /> Filter
+        </Button>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="flex-1 sm:flex-none"
+          aria-label="Delete selected"
+          title="Delete selected objects"
+          onClick={() => deleteLayers(selection, { skipLocked: true })}
+          disabled={selection.length === 0}
+        >
+          <Trash2 /> Delete
         </Button>
       </div>
 

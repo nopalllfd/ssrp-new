@@ -38,7 +38,7 @@ let measureCanvas: HTMLCanvasElement | null = null
 let measureCtx: CanvasRenderingContext2D | null = null
 
 /** Fallback penukaran sederhana bila canvas 2d tidak tersedia (test/jsdom). */
-function measure(text: string, style: CharStyle): number {
+export function measure(text: string, style: CharStyle): number {
   if (typeof document !== 'undefined') {
     try {
       if (!measureCanvas) {
@@ -54,6 +54,41 @@ function measure(text: string, style: CharStyle): number {
     }
   }
   return text.length * style.fontSize * 0.6
+}
+
+const DOT_MARK = '....'
+
+/**
+ * Auto-wrap: pecah baris yang melebihi `maxWidth` menjadi potongan baru —
+ * tiap potongan (kecuali yang terakhir) diakhiri `....`, dan potongan
+ * lanjutan diawali `....`. Hasilnya permanen (diisi langsung ke field text),
+ * sehingga semua renderer (Konva.Text, RichTextNode, exporter) konsisten.
+ * Baris eksplisit (`\n`) tetap dihormati; baris yang sudah muat tak disentuh.
+ */
+export function autoWrapText(text: string, style: CharStyle, maxWidth: number): string {
+  if (!(maxWidth > 0)) return text
+  const out: string[] = []
+  for (const line of text.split('\n')) {
+    if (measure(line, style) <= maxWidth) {
+      out.push(line)
+      continue
+    }
+    const tokens = line.match(/\S+|\s+/g) ?? []
+    let current = ''
+    for (const token of tokens) {
+      const candidate = current + token
+      if (current && measure(candidate, style) > maxWidth) {
+        // Tutup potongan ini dengan titik-titik, mulai potongan baru
+        // yang juga diawali titik-titik.
+        out.push(`${current.trimEnd()} ${DOT_MARK}`)
+        current = `${DOT_MARK} ${token.trimStart()}`
+      } else {
+        current = candidate
+      }
+    }
+    if (current.trim() !== '') out.push(current.trimEnd())
+  }
+  return out.join('\n')
 }
 
 /** Gaya dasar dari layer tanpa override. */

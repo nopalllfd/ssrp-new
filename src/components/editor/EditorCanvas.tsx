@@ -6,7 +6,12 @@ import type { Layer } from '@/types/editor'
 import { loadAssetImage } from '@/lib/images'
 import { effectiveCrop, layerVisibleForAsset } from '@/lib/editorDocument'
 import { applyKonvaImageFilter } from '@/lib/imageFilters'
-import { hasMixedAutoPurple, shiftStyleRanges } from '@/lib/richText'
+import {
+  autoWrapText,
+  baseStyleOf,
+  hasMixedAutoPurple,
+  shiftStyleRanges,
+} from '@/lib/richText'
 import { drawShapePath } from '@/lib/shapes'
 import { RichTextNode } from './RichTextNode'
 
@@ -46,6 +51,19 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
   // Inline text editing state (double-click a text layer).
   const [editingTextId, setEditingTextId] = useState<string | null>(null)
   const [editingDraft, setEditingDraft] = useState('')
+  // Penanda commit yang dipicu blur (tap di luar textarea) — selection text
+  // dipertahankan agar langsung kembali ke mode geser, bukan deselection.
+  const committedByBlur = useRef(false)
+  const taRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-tinggi textarea: ikuti jumlah baris (termasuk hasil wrap) agar
+  // preview ketikan tidak terpotong saat masih dalam mode edit.
+  useEffect(() => {
+    const el = taRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${el.scrollHeight}px`
+  }, [editingDraft, zoom, editingTextId])
 
   const editingLayer = useMemo(() => {
     if (!editingTextId) return null
@@ -56,7 +74,12 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
   const commitTextEdit = () => {
     if (!editingTextId) return
     const id = editingTextId
-    const value = editingDraft
+    const style = editingLayer ? baseStyleOf(editingLayer) : null
+    // Auto-wrap 80%: baris yang melebihi 80% lebar canvas dipecah ke baris
+    // berikutnya dengan penanda .... di ujung baris lama & awal baris baru.
+    const value = style
+      ? autoWrapText(editingDraft, style, document.canvas.width * 0.8)
+      : editingDraft
     mutate((doc) => {
       const l = doc.layers.find((x) => x.id === id)
       if (l?.type === 'text') {
@@ -69,6 +92,8 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
     })
     setEditingTextId(null)
     setTextSelection(null)
+    // Text yang baru diedit tetap ter-select → langsung mode geser (posisi).
+    setSelection([id])
   }
 
   const startTextEdit = (id: string) => {
@@ -243,6 +268,14 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
   }
 
   const onStageClick = (e: Konva.KonvaEventObject<MouseEvent | TouchEvent>) => {
+    if (committedByBlur.current) {
+      // Baru saja keluar mode edit via blur → text TETAP ter-select sehingga
+      // langsung jadi mode geser (posisi), sesuai perilaku yang diinginkan.
+      committedByBlur.current = false
+      return
+    }
+    // Android: blur textarea bisa tidak terpicu saat tap kanvas — paksa commit.
+    if (editingTextId) commitTextEdit()
     if (e.target === e.target.getStage() || e.target.name() === 'canvas-bg') {
       setSelection([])
     }
@@ -363,7 +396,15 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
                 else shapeRefs.current.delete(id)
               }}
               onSelect={(e) => {
-                const shift = 'shiftKey' in e.evt && e.evt.shiftKey
+                committedByBlur.current = false
+                // Masih mode edit tapi tap objek lain → commit dulu (blur bisa
+                // tidak terpicu di Android), baru ganti selection.
+                if (editingTextId && editingTextId !== layer.id) commitTextEdit()
+                // Shift+click (mouse) untuk multi-select. Sentuhan di Android
+                // sering ikut membawa shiftKey → sentuh SELALU exclusive supaya
+                // text lama tidak ikut ter-select bersama objek baru.
+                const isTouch = 'touches' in e.evt
+                const shift = !isTouch && 'shiftKey' in e.evt && e.evt.shiftKey
                 if (shift) addToSelection(layer.id)
                 else setSelection([layer.id])
               }}
@@ -416,13 +457,17 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
       </Stage>
       {editingLayer && (
         <textarea
+          ref={taRef}
           autoFocus
           value={editingDraft}
           onChange={(e) => setEditingDraft(e.target.value)}
           onSelect={(e) => captureTextSelection(e.currentTarget)}
           // Jangan hapus textSelection saat blur — user perlu seleksi tetap
           // aktif untuk menerapkan gaya dari panel properti sesudahnya.
-          onBlur={commitTextEdit}
+          onBlur={() => {
+            committedByBlur.current = true
+            commitTextEdit()
+          }}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault()
@@ -435,10 +480,19 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
           rows={Math.max(1, editingDraft.split('\n').length)}
           style={{
             position: 'absolute',
-            left: editingLayer.x * zoom + stagePos.x,
+            left: Math.max(0, editingLayer.x * zoom + stagePos.x),
             top: editingLayer.y * zoom + stagePos.y,
-            // Selebar konten kalimat (satu baris per enter), tanpa wrap.
+            // Selebar konten kalimat, tapi DI-CLAMP ke viewport + wrap —
+            // preview selalu menampilkan semua ketikan, tidak terpotong.
             width: 'max-content',
+            maxWidth: Math.max(
+              120,
+              width - Math.max(0, editingLayer.x * zoom + stagePos.x) - 8,
+            ),
+            whiteSpace: 'pre-wrap',
+            overflowWrap: 'break-word',
+            overflow: 'hidden',
+            boxSizing: 'border-box',
             fontSize: editingLayer.fontSize * zoom,
             fontFamily: editingLayer.fontFamily,
             fontWeight: editingLayer.fontWeight,
@@ -487,7 +541,9 @@ function EditorShape(props: {
     height: layer.height,
     rotation: layer.rotation,
     opacity: layer.opacity,
-    draggable: !layer.locked,
+    // Hanya objek TERPILIH yang bisa digeser — tap dulu baru geser, supaya
+    // saat mau memilih/menggeser objek lain objek sebelumnya tidak ikut tertarik.
+    draggable: !layer.locked && selected,
     visible: !hidden,
     onClick: props.onSelect,
     onTap: props.onSelect,
