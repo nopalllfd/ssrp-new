@@ -22,7 +22,7 @@ describe('autoWrapText', () => {
   })
 
   it('memecah baris panjang: .... di ujung baris lama & awal baris baru', () => {
-    // fontSize 32 → 1 char ± 19,2px; maxWidth 200 hanya muat ±10 char.
+    // fontSize default 12 → 1 char ± 7,2px; maxWidth 200 hanya muat ±27 char.
     const next = autoWrapText('ini adalah kalimat yang sangat panjang sekali', base(), 200)
     const lines = next.split('\n')
     expect(lines.length).toBeGreaterThan(1)
@@ -209,7 +209,7 @@ describe('layoutRichText', () => {
     const layout = layoutRichText(l, [])
     expect(layout.runs).toHaveLength(1)
     expect(layout.runs[0]?.text).toBe('abc')
-    expect(layout.height).toBeCloseTo(32 * 1.2, 1)
+    expect(layout.height).toBeCloseTo(12 * 1.2, 1)
   })
 
   it('memecah run di batas gaya', () => {

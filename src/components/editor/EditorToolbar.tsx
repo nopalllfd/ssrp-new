@@ -82,7 +82,12 @@ export function EditorToolbar({
   const undo = useEditorStore((s) => s.undo)
   const redo = useEditorStore((s) => s.redo)
   const dirty = useEditorStore((s) => s.dirty)
-  const hasImages = useEditorStore((s) => s.document.layers.some((l) => l.type === 'image'))
+  // Tombol "Edit gambar" hanya muncul ketika ada gambar yang diselect.
+  const selectedHasImage = useEditorStore((s) =>
+    s.selection.some(
+      (id) => s.document.layers.find((l) => l.id === id)?.type === 'image',
+    ),
+  )
   const selection = useEditorStore((s) => s.selection)
 
   const [editingName, setEditingName] = useState(false)
@@ -173,8 +178,9 @@ export function EditorToolbar({
         </button>
       </div>
 
-      {/* Baris 2: tools edit — mobile: lebar penuh, tiap tombol flex-1 & teks tampil */}
-      <div className="flex w-full items-center justify-center gap-1 sm:w-auto">
+      {/* Baris 2: tools edit — mobile: lebar penuh, tiap tombol flex-1 & teks
+          tampil; flex-wrap supaya tidak terpotong di layar sempit. */}
+      <div className="flex w-full flex-wrap items-center justify-center gap-1 sm:w-auto sm:flex-nowrap">
         <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
 
         <Button variant="ghost" size="sm" className="flex-1 sm:flex-none" onClick={onAddText}>
@@ -197,24 +203,24 @@ export function EditorToolbar({
             )
           })}
         </Dropdown>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="flex-1 sm:flex-none"
-          onClick={onOpenCrop}
-          disabled={!hasImages}
-        >
-          <Crop /> Crop
-        </Button>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="flex-1 sm:flex-none"
-          onClick={onOpenFilter}
-          disabled={!hasImages}
-        >
-          <SlidersHorizontal /> Filter
-        </Button>
+        {/* Crop + Filter digabung jadi "Edit gambar", muncul hanya saat gambar diselect */}
+        {selectedHasImage && (
+          <Dropdown
+            className="flex-1 sm:flex-none"
+            trigger={
+              <Button variant="ghost" size="sm" className="w-full">
+                <Crop /> Edit gambar <ChevronDown />
+              </Button>
+            }
+          >
+            <DropdownItem onClick={onOpenCrop}>
+              <Crop /> Crop
+            </DropdownItem>
+            <DropdownItem onClick={onOpenFilter}>
+              <SlidersHorizontal /> Filter
+            </DropdownItem>
+          </Dropdown>
+        )}
         <Button
           variant="ghost"
           size="sm"

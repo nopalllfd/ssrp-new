@@ -482,13 +482,11 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
             position: 'absolute',
             left: Math.max(0, editingLayer.x * zoom + stagePos.x),
             top: editingLayer.y * zoom + stagePos.y,
-            // Selebar konten kalimat, tapi DI-CLAMP ke viewport + wrap —
-            // preview selalu menampilkan semua ketikan, tidak terpotong.
+            // Selebar konten kalimat, tapi DI-CLAMP ke threshold auto-wrap
+            // commit (80% lebar canvas, di px layar) + wrap — preview mengetik
+            // pakai batas yang SAMA dengan hasil akhir, jadi tidak ada dua garis.
             width: 'max-content',
-            maxWidth: Math.max(
-              120,
-              width - Math.max(0, editingLayer.x * zoom + stagePos.x) - 8,
-            ),
+            maxWidth: Math.max(120, document.canvas.width * 0.8 * zoom),
             whiteSpace: 'pre-wrap',
             overflowWrap: 'break-word',
             overflow: 'hidden',

@@ -306,7 +306,7 @@ export function newTextLayer(partial: Partial<Extract<Layer, { type: 'text' }>> 
     locked: false,
     text: 'Double-click to edit',
     fontFamily: 'Arial',
-    fontSize: 32,
+    fontSize: 12,
     fontStyle: 'normal',
     fontWeight: 700,
     fill: DEFAULT_TEXT_FILL,
