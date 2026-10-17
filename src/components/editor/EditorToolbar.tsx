@@ -138,8 +138,8 @@ export function EditorToolbar({
         </div>
       </div>
 
-      {/* Baris 1: zoom in / zoom out */}
-      <div className="flex items-center gap-1">
+      {/* Baris 1: zoom — mobile: lebar penuh, konten di tengah */}
+      <div className="flex w-full items-center justify-center gap-1 sm:w-auto">
         <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
 
         <Button variant="ghost" size="icon" aria-label="Zoom out" onClick={() => setZoom(zoom / 1.2)}>
@@ -151,12 +151,18 @@ export function EditorToolbar({
         <Button variant="ghost" size="icon" aria-label="Zoom in" onClick={() => setZoom(zoom * 1.2)}>
           <Plus />
         </Button>
-        <Button variant="ghost" size="icon" aria-label="Fit to screen" onClick={onZoomFit}>
-          <Maximize />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="flex-1 sm:flex-none"
+          aria-label="Fit to screen"
+          onClick={onZoomFit}
+        >
+          <Maximize /> Fit
         </Button>
         <button
           type="button"
-          className="hidden cursor-pointer rounded-md px-1.5 py-1 text-xs text-muted-foreground hover:bg-accent sm:block"
+          className="flex-1 cursor-pointer rounded-md px-1.5 py-1 text-center text-xs text-muted-foreground hover:bg-accent sm:flex-none"
           onClick={onZoomReset}
           title="Reset zoom to 100%"
         >
@@ -164,17 +170,18 @@ export function EditorToolbar({
         </button>
       </div>
 
-      {/* Baris 2: tools edit */}
-      <div className="flex items-center gap-1">
+      {/* Baris 2: tools edit — mobile: lebar penuh, tiap tombol flex-1 & teks tampil */}
+      <div className="flex w-full items-center justify-center gap-1 sm:w-auto">
         <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
 
-        <Button variant="ghost" size="sm" onClick={onAddText}>
-          <Type /> <span className="hidden md:inline">Text</span>
+        <Button variant="ghost" size="sm" className="flex-1 sm:flex-none" onClick={onAddText}>
+          <Type /> Text
         </Button>
         <Dropdown
+          className="flex-1 sm:flex-none"
           trigger={
-            <Button variant="ghost" size="sm">
-              <Square /> <span className="hidden md:inline">Shape</span> <ChevronDown />
+            <Button variant="ghost" size="sm" className="w-full">
+              <Square /> Shape <ChevronDown />
             </Button>
           }
         >
@@ -187,26 +194,55 @@ export function EditorToolbar({
             )
           })}
         </Dropdown>
-        <Button variant="ghost" size="sm" onClick={onOpenCrop} disabled={!hasImages}>
-          <Crop /> <span className="hidden md:inline">Crop</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="flex-1 sm:flex-none"
+          onClick={onOpenCrop}
+          disabled={!hasImages}
+        >
+          <Crop /> Crop
         </Button>
-        <Button variant="ghost" size="sm" onClick={onOpenFilter} disabled={!hasImages}>
-          <SlidersHorizontal /> <span className="hidden md:inline">Filter</span>
+        <Button
+          variant="ghost"
+          size="sm"
+          className="flex-1 sm:flex-none"
+          onClick={onOpenFilter}
+          disabled={!hasImages}
+        >
+          <SlidersHorizontal /> Filter
         </Button>
       </div>
 
-      {/* Baris 3: save / history / export */}
-      <div className="flex items-center gap-1 sm:ml-auto">
+      {/* Baris 3: save / history / export — mobile: lebar penuh, teks tampil */}
+      <div className="flex w-full items-center justify-center gap-1 sm:ml-auto sm:w-auto">
         <div className="mx-1 hidden h-5 w-px bg-border sm:block" />
 
-        <Button variant="ghost" size="icon" aria-label="Save now" onClick={onSaveNow} disabled={!dirty}>
-          <Save />
+        <Button
+          variant="ghost"
+          size="sm"
+          className="flex-1 sm:flex-none"
+          aria-label="Save now"
+          onClick={onSaveNow}
+          disabled={!dirty}
+        >
+          <Save /> Save
         </Button>
-        <Button variant="outline" size="sm" onClick={onOpenHistory}>
-          <History /> <span className="hidden lg:inline">History</span>
+        <Button
+          variant="outline"
+          size="sm"
+          className="flex-1 sm:flex-none"
+          onClick={onOpenHistory}
+        >
+          <History /> History
         </Button>
-        <Button size="sm" aria-label="Export" onClick={onOpenExport}>
-          <Download /> <span className="hidden sm:inline">Export</span>
+        <Button
+          size="sm"
+          className="flex-1 sm:flex-none"
+          aria-label="Export"
+          onClick={onOpenExport}
+        >
+          <Download /> Export
         </Button>
       </div>
     </header>

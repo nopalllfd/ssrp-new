@@ -199,9 +199,9 @@ export function DashboardPage() {
         <Toggle checked={showTrash} onChange={setShowTrash} label="Trash" />
       </div>
 
-      {/* Kartu tools */}
+      {/* Kartu tools — satu kolom, lebar penuh */}
       {!showTrash && (
-        <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <div className="mb-4 grid gap-3">
           <button
             type="button"
             onClick={() => navigate('/ai-chatlog')}

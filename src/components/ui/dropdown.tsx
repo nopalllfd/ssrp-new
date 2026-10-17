@@ -6,10 +6,11 @@ import {
 } from 'react'
 import { cn } from '@/lib/utils'
 
-export function Dropdown({ trigger, children, align = 'left' }: {
+export function Dropdown({ trigger, children, align = 'left', className }: {
   trigger: ReactNode
   children: ReactNode
   align?: 'left' | 'right'
+  className?: string
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -33,7 +34,7 @@ export function Dropdown({ trigger, children, align = 'left' }: {
   }, [open])
 
   return (
-    <div ref={ref} className="relative inline-block">
+    <div ref={ref} className={cn('relative inline-block', className)}>
       <div onClick={() => setOpen((v) => !v)}>{trigger}</div>
       {open && (
         <div
