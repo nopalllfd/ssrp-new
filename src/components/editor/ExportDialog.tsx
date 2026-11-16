@@ -123,9 +123,9 @@ export function ExportDialog({
               value={options.mode}
               onChange={(e) => update('mode', e.target.value as 'canvas' | 'assets')}
             >
-              <option value="canvas">Canvas (composite tunggal)</option>
+              <option value="canvas">Tunggal (per page)</option>
               <option value="assets" disabled={!hasImages}>
-                Per-image crops (ZIP)
+                Semua page (ZIP)
               </option>
             </Select>
           </div>

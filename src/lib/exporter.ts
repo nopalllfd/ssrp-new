@@ -2,17 +2,12 @@ import Konva from 'konva'
 import JSZip from 'jszip'
 import { nanoid } from 'nanoid'
 import { supabase, PUBLISH_BUCKET } from '@/lib/supabase'
-import {
-  canvasToBlob,
-  downloadBlob,
-  loadAssetImage,
-  renderAssetExport,
-} from '@/lib/images'
-import { defaultCropRule, effectiveCrop, layerVisibleForAsset } from '@/lib/editorDocument'
+import { canvasToBlob, downloadBlob, loadAssetImage } from '@/lib/images'
+import { effectiveCrop, layerVisibleForAsset } from '@/lib/editorDocument'
 import { applyKonvaImageFilter } from '@/lib/imageFilters'
 import { drawRichRuns, hasMixedAutoPurple, layoutRichText } from '@/lib/richText'
 import { drawShapePath } from '@/lib/shapes'
-import type { AssetRef, CropRule, EditorDocument, ExportDefaults, Layer } from '@/types/editor'
+import type { EditorDocument, ExportDefaults, Layer } from '@/types/editor'
 
 export interface ExportFile {
   name: string
@@ -20,7 +15,7 @@ export interface ExportFile {
 }
 
 export interface ExportOptions extends ExportDefaults {
-  /** 'canvas': single composite of all layers. 'assets': one file per image layer, resolusi mengikuti canvas dengan crop region-nya diterapkan. */
+  /** 'canvas': satu halaman (aset aktif). 'assets': semua halaman, satu file per gambar. */
   mode: 'canvas' | 'assets'
   /** Canvas mode renders exactly what the editor shows: this asset's image + its text/shape layers. */
   activeAssetId?: string | null
@@ -44,6 +39,8 @@ export function exportFileName(
 /**
  * Render the whole document (background + visible layers, in order) to a
  * canvas using an offscreen Konva stage. Scale is the pixel multiplier.
+ * Dengan activeAssetId, hanya lapisan milik aset itu yang dirender — hasilnya
+ * persis seperti satu halaman di editor (termasuk crop layer).
  */
 export async function renderDocumentToCanvas(
   document: EditorDocument,
@@ -199,90 +196,6 @@ async function buildNode(l: Layer, document: EditorDocument): Promise<Konva.Shap
   })
 }
 
-/**
- * Per-asset export: the cropped image plus THIS image's text/shape layers,
- * composited at the crop output resolution. Overlay coordinates are mapped
- * from canvas space onto the image layer's box, so text sits exactly where
- * the editor shows it. Anything past the output edge is cut off.
- */
-async function renderAssetComposite(
-  document: EditorDocument,
-  imageLayer: Extract<Layer, { type: 'image' }>,
-  crop: CropRule,
-): Promise<HTMLCanvasElement> {
-  const asset = document.assets[imageLayer.assetId]
-  if (!asset) throw new Error(`Missing asset for layer ${imageLayer.id}`)
-  const base = await renderAssetExport({ asset, crop })
-  const overlays = document.layers.filter(
-    (l) =>
-      l.visible &&
-      layerVisibleForAsset(l, imageLayer.assetId) &&
-      // Gambar induk tidak jadi overlay; gambar tempelan (ownerAssetId) ikut dirender.
-      !(l.type === 'image' && !l.ownerAssetId),
-  )
-  if (overlays.length === 0) return base
-
-  const container = window.document.createElement('div')
-  container.style.position = 'fixed'
-  container.style.left = '-10000px'
-  container.style.top = '0'
-  container.style.pointerEvents = 'none'
-  window.document.body.appendChild(container)
-
-  const stage = new Konva.Stage({
-    container,
-    width: base.width,
-    height: base.height,
-  })
-  try {
-    const layer = new Konva.Layer()
-    stage.add(layer)
-    const baseNode = new Konva.Image({
-      image: base,
-      x: 0,
-      y: 0,
-      width: base.width,
-      height: base.height,
-      listening: false,
-    })
-    // Filter milik layer induk juga diterapkan pada ekspor per-aset.
-    applyKonvaImageFilter(baseNode, imageLayer.filter)
-    layer.add(baseNode)
-    // Map canvas coordinates onto the image layer's box: layer-local point
-    // (x, y) lands at ((x - box.x) * sx, (y - box.y) * sy) in output space.
-    const group = new Konva.Group({
-      scaleX: base.width / Math.max(1, imageLayer.width),
-      scaleY: base.height / Math.max(1, imageLayer.height),
-      offsetX: imageLayer.x,
-      offsetY: imageLayer.y,
-      listening: false,
-    })
-    for (const l of overlays) {
-      const node = await buildNode(l, document)
-      if (node) group.add(node)
-    }
-    layer.add(group)
-    return stage.toCanvas()
-  } finally {
-    stage.destroy()
-    container.remove()
-  }
-}
-
-/**
- * Crop untuk ekspor per-aset (ZIP): region & fit dari crop efektif layer,
- * tapi resolusi output mengikuti ukuran canvas — sama dengan ekspor tunggal
- * (mode canvas). Tanpa crop, region = gambar penuh.
- */
-export function assetExportCrop(
-  document: EditorDocument,
-  layer: Extract<Layer, { type: 'image' }>,
-  asset: AssetRef,
-): CropRule {
-  const crop = effectiveCrop(layer, document) ?? defaultCropRule(asset.width, asset.height)
-  return { ...crop, outWidth: document.canvas.width, outHeight: document.canvas.height }
-}
-
 /** Produce the full set of files for an export, honoring the chosen mode. */
 export async function buildExportFiles(
   document: EditorDocument,
@@ -298,20 +211,17 @@ export async function buildExportFiles(
     return [{ name: exportFileName(options.prefix, null, options.format), blob }]
   }
 
+  // Semua page: satu file per halaman (gambar induk). Tiap file = komposit
+  // kanvas persis seperti yang tampil di editor, ukuran mengikuti kanvas.
   const files: ExportFile[] = []
-  const imageLayers = document.layers.filter(
+  const pages = document.layers.filter(
     (l): l is Extract<Layer, { type: 'image' }> =>
-      // Overlay bukan screenshot tersendiri — ia dirender menimpa induknya.
+      // Overlay bukan halaman tersendiri — ia menimpa halaman lain.
       l.type === 'image' && l.visible && !l.ownerAssetId,
   )
   let index = 1
-  for (const layer of imageLayers) {
-    const asset = document.assets[layer.assetId]
-    if (!asset) continue
-    // Resolusi mengikuti canvas (bukan resolusi asli gambar) supaya konsisten
-    // dengan ekspor tunggal dan hasil crop yang sudah diatur user.
-    const crop = assetExportCrop(document, layer, asset)
-    const canvas = await renderAssetComposite(document, layer, crop)
+  for (const page of pages) {
+    const canvas = await renderDocumentToCanvas(document, options.scale, page.assetId)
     const blob = await canvasToBlob(canvas, options.format, options.quality, options.background)
     files.push({ name: exportFileName(options.prefix, index, options.format), blob })
     index += 1
