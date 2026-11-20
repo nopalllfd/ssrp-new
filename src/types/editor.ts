@@ -89,13 +89,26 @@ export interface ImageLayer extends BaseLayer {
   filter?: ImageFilter | null
 }
 
-/** Partial gaya text untuk satu rangkaian karakter (rich text). */
+/**
+ * Partial gaya text untuk satu rangkaian karakter (rich text).
+ * Properti stroke/shadow/lineHeight/letterSpacing bisa dioverride per
+ * rangkaian saat ada teks terseleksi; bila kosong, nilai layer dipakai.
+ */
 export interface TextStyleOverride {
   fontFamily?: string
   fontSize?: number
   fontWeight?: 400 | 500 | 600 | 700 | 800
   fontStyle?: 'normal' | 'italic'
   fill?: string
+  align?: 'left' | 'center' | 'right'
+  lineHeight?: number
+  letterSpacing?: number
+  stroke?: string
+  strokeWidth?: number
+  shadowColor?: string
+  shadowBlur?: number
+  shadowOffsetX?: number
+  shadowOffsetY?: number
 }
 
 /** Override gaya untuk karakter [start, end) di dalam TextLayer.text. */

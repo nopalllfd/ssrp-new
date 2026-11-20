@@ -22,6 +22,38 @@ import type { Layer } from '@/types/editor'
 
 type EditorDialog = 'crop' | 'filter' | 'history' | 'export'
 
+/**
+ * Tipe input yang berisi teks bebas dan punya undo native bawaan browser.
+ * Ctrl+Z di field ini dibiarkan ke browser, bukan undo dokumen.
+ */
+const NATIVE_UNDO_INPUT_TYPES = new Set([
+  'text',
+  'search',
+  'url',
+  'tel',
+  'email',
+  'password',
+  'date',
+  'time',
+  'datetime-local',
+  'month',
+  'week',
+])
+
+/**
+ * Field yang undo-nya ditangani browser (textarea/input teks/contentEditable).
+ * Select, color, number, range, checkbox, dll. tidak punya undo native yang
+ * berguna — Ctrl+Z di sana dipakai untuk undo dokumen.
+ */
+function isNativeUndoTarget(el: HTMLElement): boolean {
+  if (el.isContentEditable) return true
+  if (el.tagName === 'TEXTAREA') return true
+  if (el.tagName === 'INPUT') {
+    return NATIVE_UNDO_INPUT_TYPES.has((el as HTMLInputElement).type.toLowerCase())
+  }
+  return false
+}
+
 export function EditorPage() {
   const { projectId } = useParams<{ projectId: string }>()
   const navigate = useNavigate()
@@ -154,13 +186,9 @@ export function EditorPage() {
     if (loadState !== 'ready') return
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null
-      if (
-        target &&
-        (target.tagName === 'INPUT' ||
-          target.tagName === 'TEXTAREA' ||
-          target.tagName === 'SELECT' ||
-          target.isContentEditable)
-      ) {
+      // Hanya field teks yang punya undo native. Select/color/number/range
+      // tetap memakai undo dokumen supaya Ctrl+Z bekerja setelah mengubah gaya.
+      if (target && isNativeUndoTarget(target)) {
         return
       }
       const s = useEditorStore.getState()

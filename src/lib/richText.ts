@@ -12,6 +12,16 @@ export interface CharStyle {
   fontWeight: number
   fontStyle: string
   fill: string
+  /** Opsional: hanya ada saat style berasal dari layer/range lengkap. */
+  align?: 'left' | 'center' | 'right'
+  lineHeight?: number
+  letterSpacing?: number
+  stroke?: string
+  strokeWidth?: number
+  shadowColor?: string
+  shadowBlur?: number
+  shadowOffsetX?: number
+  shadowOffsetY?: number
 }
 
 /** Warna otomatis untuk prosa roleplay — baris yang diawali `*`. */
@@ -99,6 +109,15 @@ export function baseStyleOf(layer: TextLayer): CharStyle {
     fontWeight: layer.fontWeight,
     fontStyle: layer.fontStyle,
     fill: layer.fill,
+    align: layer.align,
+    lineHeight: layer.lineHeight,
+    letterSpacing: layer.letterSpacing,
+    stroke: layer.stroke,
+    strokeWidth: layer.strokeWidth,
+    shadowColor: layer.shadowColor,
+    shadowBlur: layer.shadowBlur,
+    shadowOffsetX: layer.shadowOffsetX,
+    shadowOffsetY: layer.shadowOffsetY,
   }
 }
 
@@ -109,6 +128,15 @@ function applyOverride(base: CharStyle, override: TextStyleOverride): CharStyle 
     fontWeight: override.fontWeight ?? base.fontWeight,
     fontStyle: override.fontStyle ?? base.fontStyle,
     fill: override.fill ?? base.fill,
+    align: override.align ?? base.align,
+    lineHeight: override.lineHeight ?? base.lineHeight,
+    letterSpacing: override.letterSpacing ?? base.letterSpacing,
+    stroke: override.stroke ?? base.stroke,
+    strokeWidth: override.strokeWidth ?? base.strokeWidth,
+    shadowColor: override.shadowColor ?? base.shadowColor,
+    shadowBlur: override.shadowBlur ?? base.shadowBlur,
+    shadowOffsetX: override.shadowOffsetX ?? base.shadowOffsetX,
+    shadowOffsetY: override.shadowOffsetY ?? base.shadowOffsetY,
   }
 }
 
@@ -118,7 +146,16 @@ function sameStyle(a: CharStyle, b: CharStyle): boolean {
     a.fontSize === b.fontSize &&
     a.fontWeight === b.fontWeight &&
     a.fontStyle === b.fontStyle &&
-    a.fill === b.fill
+    a.fill === b.fill &&
+    a.align === b.align &&
+    a.lineHeight === b.lineHeight &&
+    a.letterSpacing === b.letterSpacing &&
+    a.stroke === b.stroke &&
+    a.strokeWidth === b.strokeWidth &&
+    a.shadowColor === b.shadowColor &&
+    a.shadowBlur === b.shadowBlur &&
+    a.shadowOffsetX === b.shadowOffsetX &&
+    a.shadowOffsetY === b.shadowOffsetY
   )
 }
 
@@ -246,8 +283,9 @@ interface Token {
 }
 
 /** Pecah segmen menjadi token kata (wrap mengikuti batas kata). */
-function tokensOf(segment: Segment, letterSpacing: number): Token[] {
+function tokensOf(segment: Segment): Token[] {
   const tokens: Token[] = []
+  const letterSpacing = segment.style.letterSpacing ?? 0
   const parts = segment.text.match(/\S+|\s+/g) ?? []
   for (const part of parts) {
     const width = measure(part, segment.style) + letterSpacing * Math.max(0, part.length - 1)
@@ -259,26 +297,50 @@ function tokensOf(segment: Segment, letterSpacing: number): Token[] {
 /**
  * Gambar runs hasil layoutRichText ke context canvas 2d mentah.
  * Dipakai bersama oleh node editor (sceneFunc) dan exporter.
+ * `opts` hanya jadi fallback; nilai per-run (dari styleRanges) yang menang.
  */
 export function drawRichRuns(
   c: CanvasRenderingContext2D,
   layout: RichLayout,
-  opts: { stroke?: string; strokeWidth?: number; letterSpacing?: number },
+  opts: {
+    stroke?: string
+    strokeWidth?: number
+    letterSpacing?: number
+    shadowColor?: string
+    shadowBlur?: number
+    shadowOffsetX?: number
+    shadowOffsetY?: number
+  } = {},
 ): void {
-  const letterSpacing = opts.letterSpacing ?? 0
-  const useStroke = !!opts.strokeWidth && opts.strokeWidth > 0 && !!opts.stroke
   c.save()
   c.textBaseline = 'top'
   c.textAlign = 'left'
-  if (useStroke) {
-    c.lineWidth = opts.strokeWidth!
-    c.strokeStyle = opts.stroke!
-    c.lineJoin = 'round'
-  }
   for (const run of layout.runs) {
     const { style } = run
     c.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize}px ${style.fontFamily}`
     c.fillStyle = style.fill
+    const stroke = style.stroke ?? opts.stroke
+    const strokeWidth = style.strokeWidth ?? opts.strokeWidth ?? 0
+    const useStroke = strokeWidth > 0 && !!stroke
+    if (useStroke) {
+      c.lineWidth = strokeWidth
+      c.strokeStyle = stroke!
+      c.lineJoin = 'round'
+    }
+    const shadowBlur = style.shadowBlur ?? opts.shadowBlur ?? 0
+    const shadowColor = style.shadowColor ?? opts.shadowColor
+    if (shadowBlur > 0 && shadowColor) {
+      c.shadowColor = shadowColor
+      c.shadowBlur = shadowBlur
+      c.shadowOffsetX = style.shadowOffsetX ?? opts.shadowOffsetX ?? 0
+      c.shadowOffsetY = style.shadowOffsetY ?? opts.shadowOffsetY ?? 0
+    } else {
+      c.shadowColor = 'transparent'
+      c.shadowBlur = 0
+      c.shadowOffsetX = 0
+      c.shadowOffsetY = 0
+    }
+    const letterSpacing = style.letterSpacing ?? opts.letterSpacing ?? 0
     if (!letterSpacing) {
       if (useStroke) c.strokeText(run.text, run.x, run.y)
       c.fillText(run.text, run.x, run.y)
@@ -312,12 +374,17 @@ export function layoutRichText(
     | 'align'
     | 'lineHeight'
     | 'letterSpacing'
+    | 'stroke'
+    | 'strokeWidth'
+    | 'shadowColor'
+    | 'shadowBlur'
+    | 'shadowOffsetX'
+    | 'shadowOffsetY'
   >,
   ranges: TextStyleRange[],
 ): RichLayout {
   const base = baseStyleOf(layer as TextLayer)
   const segments = segmentize(layer.text, base, ranges)
-  const letterSpacing = layer.letterSpacing
   const lineHeightFactor = layer.lineHeight
 
   interface Placed extends Token {
@@ -339,7 +406,7 @@ export function layoutRichText(
   }
 
   for (const segment of segments) {
-    for (const token of tokensOf(segment, letterSpacing)) {
+    for (const token of tokensOf(segment)) {
       const isSpaces = /^\s+$/.test(token.text)
       // Spasi di awal baris tidak dirender (mirip word-wrap umum).
       if (isSpaces && cursor === 0) continue
@@ -360,12 +427,18 @@ export function layoutRichText(
   let y = 0
   lines.forEach((tokens, index) => {
     const maxSize = tokens.reduce((m, t) => Math.max(m, t.height), base.fontSize)
-    const lineHeightPx = maxSize * lineHeightFactor
+    // lineHeight bisa dioverride per rangkaian; token pertama menentukan
+    // tinggi baris (nilai layer dipakai bila tak ada override).
+    const lineHeightPx =
+      maxSize * (tokens[0]?.style.lineHeight ?? lineHeightFactor)
     const lineWidth = lineWidths[index] ?? 0
+    // Align bisa dioverride per rangkaian; token pertama baris menentukan
+    // align baris ini (nilai layer dipakai bila tak ada override).
+    const align = tokens[0]?.style.align ?? layer.align
     const alignOffset =
-      layer.align === 'center'
+      align === 'center'
         ? (maxLineWidth - lineWidth) / 2
-        : layer.align === 'right'
+        : align === 'right'
           ? maxLineWidth - lineWidth
           : 0
     let x = alignOffset

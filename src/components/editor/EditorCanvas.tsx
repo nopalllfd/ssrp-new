@@ -485,19 +485,25 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
                   fontWeight: run.style.fontWeight,
                   fontStyle: run.style.fontStyle,
                   color: run.style.fill,
-                  letterSpacing: editingLayer.letterSpacing * zoom,
+                  letterSpacing: (run.style.letterSpacing ?? editingLayer.letterSpacing) * zoom,
                   lineHeight: 'normal',
                   whiteSpace: 'pre',
                   // Samakan dengan Konva: stroke digambar dulu, lalu fill di
                   // atasnya (fillAfterStrokeEnabled) supaya garis tepi tegas.
                   WebkitTextStroke:
-                    editingLayer.strokeWidth > 0
-                      ? `${editingLayer.strokeWidth * zoom}px ${editingLayer.stroke}`
+                    (run.style.strokeWidth ?? editingLayer.strokeWidth) > 0
+                      ? `${(run.style.strokeWidth ?? editingLayer.strokeWidth) * zoom}px ${
+                          run.style.stroke ?? editingLayer.stroke
+                        }`
                       : undefined,
                   paintOrder: 'stroke fill',
                   textShadow:
-                    editingLayer.shadowBlur > 0
-                      ? `${editingLayer.shadowOffsetX * zoom}px ${editingLayer.shadowOffsetY * zoom}px ${editingLayer.shadowBlur * zoom}px ${editingLayer.shadowColor}`
+                    (run.style.shadowBlur ?? editingLayer.shadowBlur) > 0
+                      ? `${(run.style.shadowOffsetX ?? editingLayer.shadowOffsetX) * zoom}px ${
+                          (run.style.shadowOffsetY ?? editingLayer.shadowOffsetY) * zoom
+                        }px ${(run.style.shadowBlur ?? editingLayer.shadowBlur) * zoom}px ${
+                          run.style.shadowColor ?? editingLayer.shadowColor
+                        }`
                       : undefined,
                 }}
               >

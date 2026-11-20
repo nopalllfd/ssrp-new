@@ -67,6 +67,15 @@ const styleRangeSchema = z.object({
     .optional(),
   fontStyle: z.enum(['normal', 'italic']).optional(),
   fill: z.string().optional(),
+  align: z.enum(['left', 'center', 'right']).optional(),
+  lineHeight: z.number().positive().optional(),
+  letterSpacing: z.number().optional(),
+  stroke: z.string().optional(),
+  strokeWidth: z.number().min(0).optional(),
+  shadowColor: z.string().optional(),
+  shadowBlur: z.number().min(0).optional(),
+  shadowOffsetX: z.number().optional(),
+  shadowOffsetY: z.number().optional(),
 })
 
 const textLayerSchema = z.object({

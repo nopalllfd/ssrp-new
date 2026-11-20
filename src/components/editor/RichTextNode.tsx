@@ -29,10 +29,16 @@ export function RichTextNode({
       // Bounds deklaratif: dipakai Transformer & isolation canvas shadow.
       selfRectFunc={() => ({ x: 0, y: 0, width: layout.width, height: layout.height })}
       sceneFunc={(ctx) => {
+        // Stroke/shadow/letterSpacing digambar manual per-run (termasuk
+        // override styleRanges), bukan lewat properti Konva.
         drawRichRuns(ctx._context, layout, {
           stroke: layer.stroke,
           strokeWidth: layer.strokeWidth,
           letterSpacing: layer.letterSpacing,
+          shadowColor: layer.shadowColor,
+          shadowBlur: layer.shadowBlur,
+          shadowOffsetX: layer.shadowOffsetX,
+          shadowOffsetY: layer.shadowOffsetY,
         })
       }}
       hitFunc={(ctx, shape) => {
@@ -41,10 +47,6 @@ export function RichTextNode({
         c.rect(0, 0, layout.width, layout.height)
         ctx.fillStrokeShape(shape)
       }}
-      shadowColor={layer.shadowBlur > 0 ? layer.shadowColor : undefined}
-      shadowBlur={layer.shadowBlur || undefined}
-      shadowOffsetX={layer.shadowOffsetX || undefined}
-      shadowOffsetY={layer.shadowOffsetY || undefined}
     />
   )
 }

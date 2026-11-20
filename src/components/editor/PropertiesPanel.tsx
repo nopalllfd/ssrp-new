@@ -191,6 +191,7 @@ function TextControls({
   onChange: (fn: (l: Layer) => void, coalesce?: boolean) => void
 }) {
   const textSelection = useEditorStore((s) => s.textSelection)
+  const setTextSelection = useEditorStore((s) => s.setTextSelection)
   // Draft input angka Line height: field boleh kosong sementara saat diedit.
   const [lhDraft, setLhDraft] = useState<string | null>(null)
   // Seleksi karakter di editor inline milik layer ini (bila masih valid).
@@ -227,7 +228,7 @@ function TextControls({
   // Nilai tampilan kontrol = gaya efektif pada awal seleksi.
   const shown = hasSel && sel ? styleAt(layer, layer.styleRanges ?? [], sel.start) : null
   // Line height dibulatkan 2 desimal supaya slider & input angka konsisten.
-  const lh = Math.round(layer.lineHeight * 100) / 100
+  const lh = Math.round((shown?.lineHeight ?? layer.lineHeight) * 100) / 100
 
   // Salin seluruh gaya text ini ke SEMUA layer text di semua gambar.
   const applyStyleToAllImages = () => {
@@ -261,6 +262,16 @@ function TextControls({
               l.text = e.target.value
             })
           }
+          onSelect={(e) => {
+            // Catat seleksi di textarea panel juga, supaya tombol gaya bisa
+            // diterapkan hanya ke rangkaian yang diseleksi.
+            const t = e.currentTarget
+            setTextSelection(
+              t.selectionEnd > t.selectionStart
+                ? { layerId: layer.id, start: t.selectionStart, end: t.selectionEnd }
+                : null,
+            )
+          }}
         />
       </div>
       <div>
@@ -324,8 +335,11 @@ function TextControls({
         <Label>Align</Label>
         <Select
           className="mt-1"
-          value={layer.align}
-          onChange={(e) => upd((l) => (l.align = e.target.value as TextLayer['align']), false)}
+          value={shown?.align ?? layer.align}
+          onChange={(e) => {
+            const a = e.target.value as TextLayer['align']
+            applyProp({ align: a }, (l) => (l.align = a), false)
+          }}
         >
           <option value="left">Left</option>
           <option value="center">Center</option>
@@ -344,7 +358,10 @@ function TextControls({
             max={3}
             step={0.05}
             value={lh}
-            onChange={(e) => upd((l) => (l.lineHeight = Math.max(0.5, Number(e.target.value))))}
+            onChange={(e) => {
+              const v = Math.max(0.5, Number(e.target.value))
+              applyProp({ lineHeight: v }, (l) => (l.lineHeight = v))
+            }}
           />
           <Input
             className="w-16 shrink-0"
@@ -357,7 +374,10 @@ function TextControls({
               setLhDraft(raw)
               if (raw.trim() === '') return
               const n = Number(raw)
-              if (Number.isFinite(n)) upd((l) => (l.lineHeight = Math.max(0.5, n)))
+              if (Number.isFinite(n)) {
+                const v = Math.max(0.5, n)
+                applyProp({ lineHeight: v }, (l) => (l.lineHeight = v))
+              }
             }}
             onBlur={() => setLhDraft(null)}
           />
@@ -371,38 +391,53 @@ function TextControls({
       <div className="grid grid-cols-2 gap-2">
         <ColorField
           label="Stroke"
-          value={layer.stroke || '#000000'}
-          onChange={(v) =>
-            upd((l) => {
-              l.stroke = v
-              // Beri ketebalan awal agar stroke langsung terlihat.
-              if (l.strokeWidth === 0) l.strokeWidth = 2
-            }, false)
-          }
+          value={(shown?.stroke ?? layer.stroke) || '#000000'}
+          onChange={(v) => {
+            const w = shown?.strokeWidth ?? layer.strokeWidth
+            // Stroke baru langsung terlihat: beri ketebalan awal bila belum ada.
+            applyProp(
+              w > 0 ? { stroke: v } : { stroke: v, strokeWidth: 2 },
+              (l) => {
+                l.stroke = v
+                if (l.strokeWidth === 0) l.strokeWidth = 2
+              },
+              false,
+            )
+          }}
         />
         <NumberField
           label="Stroke width"
-          value={layer.strokeWidth}
-          onChange={(v) =>
-            upd((l) => {
-              l.strokeWidth = Math.max(0, v)
-              // Stroke tanpa warna tidak digambar; samakan dengan swatch default.
-              if (l.strokeWidth > 0 && !l.stroke) l.stroke = '#000000'
-            })
-          }
+          value={shown?.strokeWidth ?? layer.strokeWidth}
+          onChange={(v) => {
+            const w = Math.max(0, v)
+            const color = shown?.stroke ?? layer.stroke
+            applyProp(
+              w > 0 && !color ? { strokeWidth: w, stroke: '#000000' } : { strokeWidth: w },
+              (l) => {
+                l.strokeWidth = w
+                // Stroke tanpa warna tidak digambar; samakan dengan swatch default.
+                if (l.strokeWidth > 0 && !l.stroke) l.stroke = '#000000'
+              },
+            )
+          }}
         />
       </div>
       <div>
         <div className="mb-1 flex justify-between">
           <Label>Shadow blur</Label>
-          <span className="text-xs text-muted-foreground">{layer.shadowBlur}</span>
+          <span className="text-xs text-muted-foreground">
+            {shown?.shadowBlur ?? layer.shadowBlur}
+          </span>
         </div>
         <Slider
           min={0}
           max={40}
           step={1}
-          value={layer.shadowBlur}
-          onChange={(e) => upd((l) => (l.shadowBlur = Number(e.target.value)))}
+          value={shown?.shadowBlur ?? layer.shadowBlur}
+          onChange={(e) => {
+            const v = Number(e.target.value)
+            applyProp({ shadowBlur: v }, (l) => (l.shadowBlur = v))
+          }}
         />
       </div>
       <div className="border-t border-border pt-3">

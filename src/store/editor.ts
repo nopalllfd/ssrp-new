@@ -16,6 +16,14 @@ export { AUTO_PURPLE }
 
 const HISTORY_LIMIT = 100
 
+/**
+ * Penanda burst koalesensi: mutasi berurutan dengan `coalesce: true`
+ * (slider/drag) digabung ke satu entri history. Direset saat undo/redo/
+ * load supaya mutasi pertama setelah itu selalu punya entri sendiri —
+ * kalau tidak, perubahan pertama pasca-undo tak bisa di-undo lagi.
+ */
+let coalesceOpen = false
+
 export interface EditorState {
   document: EditorDocument
   selection: string[]
@@ -127,6 +135,20 @@ export function applyAutoTextColors(doc: EditorDocument) {
 }
 
 /**
+ * Apakah isi text dokumen berubah (ditambah/diubah/dihapus layer).
+ * Dipakai agar auto-purple hanya dievaluasi ulang saat text benar-benar
+ * berubah — perubahan gaya (warna, stroke, dll.) tidak menimpa pilihan user.
+ */
+function textContentChanged(prev: EditorDocument, next: EditorDocument): boolean {
+  const before = new Map(
+    prev.layers.map((l) => [l.id, l.type === 'text' ? l.text : null]),
+  )
+  return next.layers.some(
+    (l) => l.type === 'text' && l.text !== before.get(l.id),
+  )
+}
+
+/**
  * Salin seluruh gaya text `src` ke SEMUA layer text di dokumen (semua gambar).
  * Warna ungu prosa `*` bersifat turunan dari isi text, bukan pilihan user,
  * jadi dievaluasi ulang per-target: text `*` tetap ungu, text lain pakai
@@ -176,6 +198,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     applyAutoTextColors(loaded)
     // Layer lama tanpa pemilik jadi milik gambar pertama, bukan tampil di semua.
     claimUnscopedLayers(loaded, firstImageAssetId(loaded))
+    coalesceOpen = false
     set({
       document: loaded,
       revision,
@@ -192,7 +215,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     })
   },
 
-  resetDocument: () =>
+  resetDocument: () => {
+    coalesceOpen = false
     set({
       document: createEmptyDocument(),
       selection: [],
@@ -204,17 +228,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       activeAssetId: null,
       textSelection: null,
       chatlog: null,
-    }),
+    })
+  },
 
   mutate: (fn, options) => {
     const { document, past, dirty } = get()
     const next = cloneDocument(document)
     fn(next)
-    applyAutoTextColors(next)
+    // Auto-purple hanya dihitung ulang saat isi text berubah. Perubahan gaya
+    // (mis. fill) tidak boleh menimpa warna yang baru dipilih user.
+    if (textContentChanged(document, next)) applyAutoTextColors(next)
     // Direct mutations go through this funnel so undo stays coherent. Callers
     // can coalesce high-frequency drags (sliders, transformer) into one
     // history entry by passing { coalesce: true } on consecutive calls.
-    const coalescable = options?.coalesce && dirty
+    const coalescable = options?.coalesce && dirty && coalesceOpen
+    coalesceOpen = true
     set({
       document: next,
       dirty: true,
@@ -228,6 +256,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { past, future, document } = get()
     const prev = past[past.length - 1]
     if (!prev) return
+    coalesceOpen = false
     set({
       document: prev,
       past: past.slice(0, -1),
@@ -241,6 +270,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const { past, future, document } = get()
     const next = future[0]
     if (!next) return
+    coalesceOpen = false
     set({
       document: next,
       past: [...past, document],

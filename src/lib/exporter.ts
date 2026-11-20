@@ -139,12 +139,12 @@ async function buildNode(l: Layer, document: EditorDocument): Promise<Konva.Shap
             stroke: l.stroke,
             strokeWidth: l.strokeWidth,
             letterSpacing: l.letterSpacing,
+            shadowColor: l.shadowColor,
+            shadowBlur: l.shadowBlur,
+            shadowOffsetX: l.shadowOffsetX,
+            shadowOffsetY: l.shadowOffsetY,
           })
-        },
-        shadowColor: l.shadowBlur > 0 ? l.shadowColor : undefined,
-        shadowBlur: l.shadowBlur || undefined,
-        shadowOffsetX: l.shadowOffsetX || undefined,
-        shadowOffsetY: l.shadowOffsetY || undefined,
+        }
       })
     }
     // Teks berukuran otomatis (ikut konten, tanpa word-wrap): jangan kirim

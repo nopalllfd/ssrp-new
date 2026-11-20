@@ -47,6 +47,13 @@ const SYNC_LABEL: Record<SyncStatus, { label: string; className: string }> = {
   conflict: { label: 'Conflict', className: 'text-red-700 dark:text-red-300 border-red-500/30 bg-red-500/10' },
 }
 
+/**
+ * Label status di-debounce: transisi cepat (Unsaved → Autosaving → Synced)
+ * tidak langsung mengganti teks badge, sehingga badge tidak berkedip dan
+ * lebarnya tidak berubah-ubah.
+ */
+const SYNC_LABEL_DEBOUNCE_MS = 600
+
 export function EditorToolbar({
   projectName,
   onRename,
@@ -94,7 +101,13 @@ export function EditorToolbar({
   const [name, setName] = useState(projectName)
   useEffect(() => setName(projectName), [projectName])
 
-  const sync = SYNC_LABEL[syncStatus]
+  // Label sync tampilan di-debounce; status asli tetap dipakai logika lain.
+  const [shownStatus, setShownStatus] = useState(syncStatus)
+  useEffect(() => {
+    const t = window.setTimeout(() => setShownStatus(syncStatus), SYNC_LABEL_DEBOUNCE_MS)
+    return () => window.clearTimeout(t)
+  }, [syncStatus])
+  const sync = SYNC_LABEL[shownStatus]
 
   return (
     <header className="flex shrink-0 flex-col gap-1 border-b border-border bg-card px-2 py-1.5 sm:flex-row sm:flex-wrap sm:items-center sm:gap-1">
@@ -134,7 +147,11 @@ export function EditorToolbar({
           </button>
         )}
 
-        <Badge className={sync.className}>{sync.label}</Badge>
+        {/* Lebar minimum tetap supaya teks status yang berubah-ubah tidak
+            menggeser tombol undo/redo di sebelahnya. */}
+        <Badge className={`${sync.className} min-w-[104px] justify-center whitespace-nowrap`}>
+          {sync.label}
+        </Badge>
 
         <div className="ml-auto flex items-center gap-1">
           <Button variant="ghost" size="icon" aria-label="Undo" disabled={!canUndo} onClick={undo}>
