@@ -129,19 +129,29 @@ export async function listProjectMembers(projectId: string): Promise<ProjectMemb
   if (projErr) throw new Error(projErr.message)
   const ownerId = proj.user_id as string
 
-  const { data: ownerProfile, error: ownerProfileErr } = await supabase
-    .from('profiles')
-    .select('display_name, avatar_url')
-    .eq('id', ownerId)
-    .maybeSingle()
-  if (ownerProfileErr) throw new Error(ownerProfileErr.message)
-
   const { data, error } = await supabase
     .from('project_members')
-    .select('project_id, user_id, role, created_at, profiles (display_name, avatar_url)')
+    .select('project_id, user_id, role, created_at')
     .eq('project_id', projectId)
     .order('created_at', { ascending: true })
   if (error) throw new Error(error.message)
+
+  // Ambil profil owner + semua anggota sekaligus. Embed "profiles" tidak
+  // bisa dipakai di sini karena project_members tidak punya FK ke profiles.
+  const userIds = [...new Set([ownerId, ...(data ?? []).map((row) => row.user_id as string)])]
+  const { data: profiles, error: profilesErr } = await supabase
+    .from('profiles')
+    .select('id, display_name, avatar_url')
+    .in('id', userIds)
+  if (profilesErr) throw new Error(profilesErr.message)
+
+  const profileMap = new Map<string, { display_name: string | null; avatar_url: string | null }>()
+  for (const p of profiles ?? []) {
+    profileMap.set(p.id as string, {
+      display_name: p.display_name as string | null,
+      avatar_url: p.avatar_url as string | null,
+    })
+  }
 
   const rows: ProjectMemberRow[] = [
     {
@@ -149,20 +159,17 @@ export async function listProjectMembers(projectId: string): Promise<ProjectMemb
       user_id: ownerId,
       role: 'owner',
       created_at: '',
-      profile: ownerProfile
-        ? { display_name: ownerProfile.display_name, avatar_url: ownerProfile.avatar_url }
-        : null,
+      profile: profileMap.get(ownerId) ?? null,
     },
   ]
   for (const row of data ?? []) {
+    const userId = row.user_id as string
     rows.push({
       project_id: row.project_id as string,
-      user_id: row.user_id as string,
+      user_id: userId,
       role: row.role as 'owner' | 'collaborator',
       created_at: row.created_at as string,
-      profile: (
-        Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
-      ) as { display_name: string | null; avatar_url: string | null } | null,
+      profile: profileMap.get(userId) ?? null,
     })
   }
   return rows

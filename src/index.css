@@ -102,6 +102,16 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* Outline fokus: buang outline bawaan browser (ring biru tebal ala UA),
+   ganti dengan ring mengikuti token tema. */
+:where(input, select, textarea, button, a):focus {
+  outline: none;
+}
+:where(input, select, textarea, button, a):focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 1px;
+}
+
 .konvajs-content {
   outline: none;
 }

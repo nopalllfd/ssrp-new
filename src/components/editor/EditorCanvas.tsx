@@ -1,15 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Stage, Layer as KonvaLayerNode, Rect, Text, Transformer, Image as KonvaImage, Line, Shape } from 'react-konva'
 import type Konva from 'konva'
-import { useEditorStore, resolveAutoTextFill } from '@/store/editor'
+import { useEditorStore } from '@/store/editor'
 import type { Layer } from '@/types/editor'
 import { loadAssetImage } from '@/lib/images'
 import { effectiveCrop, layerVisibleForAsset } from '@/lib/editorDocument'
 import { applyKonvaImageFilter } from '@/lib/imageFilters'
 import {
-  autoWrapText,
-  baseStyleOf,
   hasMixedAutoPurple,
+  layoutRichText,
   shiftStyleRanges,
 } from '@/lib/richText'
 import { drawShapePath } from '@/lib/shapes'
@@ -56,30 +55,28 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
   const committedByBlur = useRef(false)
   const taRef = useRef<HTMLTextAreaElement>(null)
 
-  // Auto-tinggi textarea: ikuti jumlah baris (termasuk hasil wrap) agar
-  // preview ketikan tidak terpotong saat masih dalam mode edit.
-  useEffect(() => {
-    const el = taRef.current
-    if (!el) return
-    el.style.height = 'auto'
-    el.style.height = `${el.scrollHeight}px`
-  }, [editingDraft, zoom, editingTextId])
-
   const editingLayer = useMemo(() => {
     if (!editingTextId) return null
     const l = document.layers.find((x) => x.id === editingTextId)
     return l && l.type === 'text' ? l : null
   }, [editingTextId, document.layers])
 
+  // Layout preview edit: dipakai textarea DAN overlay rich text, supaya
+  // posisi/wrap/gaya persis sama dengan renderer kanvas (layoutRichText).
+  const editLayout = useMemo(() => {
+    if (!editingLayer) return null
+    return layoutRichText(
+      { ...editingLayer, text: editingDraft },
+      editingLayer.styleRanges ?? [],
+    )
+  }, [editingLayer, editingDraft])
+
   const commitTextEdit = () => {
     if (!editingTextId) return
     const id = editingTextId
-    const style = editingLayer ? baseStyleOf(editingLayer) : null
-    // Auto-wrap 80%: baris yang melebihi 80% lebar canvas dipecah ke baris
-    // berikutnya dengan penanda .... di ujung baris lama & awal baris baru.
-    const value = style
-      ? autoWrapText(editingDraft, style, document.canvas.width * 0.8)
-      : editingDraft
+    // Teks dikirim apa adanya (tanpa auto-wrap): apa yang terlihat di
+    // textarea/overlay == hasil di kanvas.
+    const value = editingDraft
     mutate((doc) => {
       const l = doc.layers.find((x) => x.id === id)
       if (l?.type === 'text') {
@@ -455,64 +452,99 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
         />
       </KonvaLayerNode>
       </Stage>
-      {editingLayer && (
-        <textarea
-          ref={taRef}
-          autoFocus
-          value={editingDraft}
-          onChange={(e) => setEditingDraft(e.target.value)}
-          onSelect={(e) => captureTextSelection(e.currentTarget)}
-          // Jangan hapus textSelection saat blur — user perlu seleksi tetap
-          // aktif untuk menerapkan gaya dari panel properti sesudahnya.
-          onBlur={() => {
-            committedByBlur.current = true
-            commitTextEdit()
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.shiftKey) {
-              e.preventDefault()
-              commitTextEdit()
-            } else if (e.key === 'Escape') {
-              setEditingTextId(null)
-              setTextSelection(null)
-            }
-          }}
-          rows={Math.max(1, editingDraft.split('\n').length)}
+      {editingLayer && editLayout && (
+        // Overlay edit: rich text dirender persis seperti kanvas (warna
+        // per-baris `*`, gaya per-rangkaian, align, line-height), sedangkan
+        // textarea transparan di atasnya hanya untuk kursor/seleksi. Ini
+        // menghilangkan perbedaan bentuk, wrap, warna, dan gaya saat edit.
+        <div
           style={{
             position: 'absolute',
             left: Math.max(0, editingLayer.x * zoom + stagePos.x),
             top: editingLayer.y * zoom + stagePos.y,
-            // Kotak pas mengikuti lebar teks (max-content) — bentuk textarea
-            // mengikuti konten seperti gambar referensi. Wrap 80% kanvas
-            // tetap diterapkan saat commit (autoWrapText).
-            width: 'max-content',
-            whiteSpace: 'pre-wrap',
-            overflowWrap: 'break-word',
-            overflow: 'hidden',
-            boxSizing: 'border-box',
-            fontSize: editingLayer.fontSize * zoom,
-            fontFamily: editingLayer.fontFamily,
-            fontWeight: editingLayer.fontWeight,
-            fontStyle: editingLayer.fontStyle,
-            // Preview ~ hasil akhir: teks campuran dasarnya putih (baris *
-            // ungu hanya tampil setelah commit via renderer per-baris).
-            color: resolveAutoTextFill(editingDraft, editingLayer.fill),
-            lineHeight: editingLayer.lineHeight,
-            letterSpacing: editingLayer.letterSpacing,
-            textAlign: editingLayer.align,
+            width: editLayout.width * zoom,
+            height: editLayout.height * zoom,
             transform: editingLayer.rotation
               ? `rotate(${editingLayer.rotation}deg)`
               : undefined,
             transformOrigin: 'top left',
-            background: 'transparent',
-            border: '1px dashed #4f9cff',
-            outline: 'none',
-            resize: 'none',
-            padding: 0,
-            margin: 0,
             zIndex: 10,
+            pointerEvents: 'none',
           }}
-        />
+        >
+          <div style={{ position: 'relative', width: '100%', height: '100%' }}>
+            {editLayout.runs.map((run, i) => (
+              <span
+                key={i}
+                style={{
+                  position: 'absolute',
+                  left: run.x * zoom,
+                  top: run.y * zoom,
+                  fontSize: run.style.fontSize * zoom,
+                  fontFamily: run.style.fontFamily,
+                  fontWeight: run.style.fontWeight,
+                  fontStyle: run.style.fontStyle,
+                  color: run.style.fill,
+                  letterSpacing: editingLayer.letterSpacing * zoom,
+                  lineHeight: 'normal',
+                  whiteSpace: 'pre',
+                }}
+              >
+                {run.text}
+              </span>
+            ))}
+          </div>
+          <textarea
+            ref={taRef}
+            autoFocus
+            value={editingDraft}
+            onChange={(e) => setEditingDraft(e.target.value)}
+            onSelect={(e) => captureTextSelection(e.currentTarget)}
+            // Jangan hapus textSelection saat blur — user perlu seleksi tetap
+            // aktif untuk menerapkan gaya dari panel properti sesudahnya.
+            onBlur={() => {
+              committedByBlur.current = true
+              commitTextEdit()
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                commitTextEdit()
+              } else if (e.key === 'Escape') {
+                setEditingTextId(null)
+                setTextSelection(null)
+              }
+            }}
+            rows={1}
+            style={{
+              position: 'absolute',
+              left: 0,
+              top: 0,
+              width: editLayout.width * zoom + editingLayer.fontSize * zoom * 2,
+              height: editLayout.height * zoom,
+              boxSizing: 'border-box',
+              fontSize: editingLayer.fontSize * zoom,
+              fontFamily: editingLayer.fontFamily,
+              fontWeight: editingLayer.fontWeight,
+              fontStyle: editingLayer.fontStyle,
+              lineHeight: editingLayer.lineHeight,
+              letterSpacing: editingLayer.letterSpacing * zoom,
+              textAlign: editingLayer.align,
+              // Teks transparan: yang tampil adalah overlay rich text di bawah.
+              color: 'transparent',
+              caretColor: editingLayer.fill,
+              background: 'transparent',
+              border: 'none',
+              outline: 'none',
+              resize: 'none',
+              padding: 0,
+              margin: 0,
+              whiteSpace: 'pre',
+              overflow: 'hidden',
+              pointerEvents: 'auto',
+            }}
+          />
+        </div>
       )}
     </div>
   )
