@@ -11,6 +11,19 @@
       rel="stylesheet"
     />
     <title>Yurchat — Beta Release 1.0.0</title>
+    <script>
+      // Terapkan tema tersimpan SEBELUM paint pertama agar tidak ada kedip
+      // (flash) tema bawaan saat halaman dimuat.
+      (function () {
+        try {
+          var t = localStorage.getItem('yurchat-theme')
+          if (!t) {
+            t = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+          }
+          if (t === 'dark') document.documentElement.classList.add('dark')
+        } catch (e) {}
+      })()
+    </script>
   </head>
   <body>
     <div id="root"></div>

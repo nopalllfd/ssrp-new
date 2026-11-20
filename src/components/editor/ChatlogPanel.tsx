@@ -131,7 +131,7 @@ export function ChatlogPanel() {
         </div>
       )}
 
-      {appliedInfo && <p className="text-xs text-emerald-400">{appliedInfo}</p>}
+      {appliedInfo && <p className="text-xs text-emerald-700 dark:text-emerald-400">{appliedInfo}</p>}
 
       {/* Terapkan ke gambar */}
       <Button

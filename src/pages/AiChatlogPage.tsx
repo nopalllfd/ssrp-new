@@ -670,8 +670,8 @@ export function AiChatlogPage() {
                 <Badge
                   className={
                     result.stats.status === 'complete'
-                      ? 'mt-1 border-emerald-500/40 bg-emerald-500/10 text-emerald-600'
-                      : 'mt-1 border-amber-500/40 bg-amber-500/10 text-amber-600'
+                      ? 'mt-1 border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                      : 'mt-1 border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300'
                   }
                 >
                   {result.stats.status === 'complete' ? 'Complete' : 'Partial'}

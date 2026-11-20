@@ -43,6 +43,14 @@ export interface ProjectVersionRow {
   created_at: string
 }
 
+export interface ProjectMemberRow {
+  project_id: string
+  user_id: string
+  role: 'owner' | 'collaborator'
+  created_at: string
+  profile: { display_name: string | null; avatar_url: string | null } | null
+}
+
 export interface TemplateRow {
   id: string
   user_id: string | null
@@ -106,6 +114,88 @@ export async function restoreProject(id: string): Promise<void> {
 export async function deleteProjectForever(id: string): Promise<void> {
   // Children cascade. Storage objects are removed via removeProjectObjects.
   const { error } = await supabase.from('projects').delete().eq('id', id)
+  if (error) throw new Error(error.message)
+}
+
+// ------------------------------------------------------- project members
+
+/** Daftar anggota sebuah project (owner + kolaborator) beserta profilnya. */
+export async function listProjectMembers(projectId: string): Promise<ProjectMemberRow[]> {
+  const { data: proj, error: projErr } = await supabase
+    .from('projects')
+    .select('user_id')
+    .eq('id', projectId)
+    .single()
+  if (projErr) throw new Error(projErr.message)
+  const ownerId = proj.user_id as string
+
+  const { data: ownerProfile, error: ownerProfileErr } = await supabase
+    .from('profiles')
+    .select('display_name, avatar_url')
+    .eq('id', ownerId)
+    .maybeSingle()
+  if (ownerProfileErr) throw new Error(ownerProfileErr.message)
+
+  const { data, error } = await supabase
+    .from('project_members')
+    .select('project_id, user_id, role, created_at, profiles (display_name, avatar_url)')
+    .eq('project_id', projectId)
+    .order('created_at', { ascending: true })
+  if (error) throw new Error(error.message)
+
+  const rows: ProjectMemberRow[] = [
+    {
+      project_id: projectId,
+      user_id: ownerId,
+      role: 'owner',
+      created_at: '',
+      profile: ownerProfile
+        ? { display_name: ownerProfile.display_name, avatar_url: ownerProfile.avatar_url }
+        : null,
+    },
+  ]
+  for (const row of data ?? []) {
+    rows.push({
+      project_id: row.project_id as string,
+      user_id: row.user_id as string,
+      role: row.role as 'owner' | 'collaborator',
+      created_at: row.created_at as string,
+      profile: (
+        Array.isArray(row.profiles) ? row.profiles[0] : row.profiles
+      ) as { display_name: string | null; avatar_url: string | null } | null,
+    })
+  }
+  return rows
+}
+
+/** Cari user lain berdasarkan nama tampilan (untuk undangan anggota). */
+export async function searchUsers(query: string, limit = 8): Promise<
+  { id: string; display_name: string | null; avatar_url: string | null }[]
+> {
+  const q = query.trim()
+  let builder = supabase
+    .from('profiles')
+    .select('id, display_name, avatar_url')
+    .limit(limit)
+  if (q) builder = builder.ilike('display_name', `%${q}%`)
+  const { data, error } = await builder
+  if (error) throw new Error(error.message)
+  return (data ?? []) as { id: string; display_name: string | null; avatar_url: string | null }[]
+}
+
+export async function addProjectMember(projectId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('project_members')
+    .upsert({ project_id: projectId, user_id: userId, role: 'collaborator' })
+  if (error) throw new Error(error.message)
+}
+
+export async function removeProjectMember(projectId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('project_members')
+    .delete()
+    .eq('project_id', projectId)
+    .eq('user_id', userId)
   if (error) throw new Error(error.message)
 }
 

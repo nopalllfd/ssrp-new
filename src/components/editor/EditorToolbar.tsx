@@ -36,15 +36,15 @@ const SHAPE_ICONS: Record<ShapeKind, typeof Square> = {
 }
 
 const SYNC_LABEL: Record<SyncStatus, { label: string; className: string }> = {
-  synced: { label: 'Synced', className: 'text-emerald-300 border-emerald-500/30 bg-emerald-500/10' },
-  local: { label: 'Saved locally', className: 'text-amber-300 border-amber-500/30 bg-amber-500/10' },
-  autosaving: { label: 'Autosaving…', className: 'text-sky-300 border-sky-500/30 bg-sky-500/10' },
-  saving: { label: 'Saving…', className: 'text-sky-300 border-sky-500/30 bg-sky-500/10' },
-  uploading: { label: 'Uploading…', className: 'text-sky-300 border-sky-500/30 bg-sky-500/10' },
-  unsaved: { label: 'Unsaved changes', className: 'text-amber-300 border-amber-500/30 bg-amber-500/10' },
-  'save-failed': { label: 'Save failed', className: 'text-red-300 border-red-500/30 bg-red-500/10' },
-  'upload-failed': { label: 'Upload failed', className: 'text-red-300 border-red-500/30 bg-red-500/10' },
-  conflict: { label: 'Conflict', className: 'text-red-300 border-red-500/30 bg-red-500/10' },
+  synced: { label: 'Synced', className: 'text-emerald-700 dark:text-emerald-300 border-emerald-500/30 bg-emerald-500/10' },
+  local: { label: 'Saved locally', className: 'text-amber-700 dark:text-amber-300 border-amber-500/30 bg-amber-500/10' },
+  autosaving: { label: 'Autosaving…', className: 'text-sky-700 dark:text-sky-300 border-sky-500/30 bg-sky-500/10' },
+  saving: { label: 'Saving…', className: 'text-sky-700 dark:text-sky-300 border-sky-500/30 bg-sky-500/10' },
+  uploading: { label: 'Uploading…', className: 'text-sky-700 dark:text-sky-300 border-sky-500/30 bg-sky-500/10' },
+  unsaved: { label: 'Unsaved changes', className: 'text-amber-700 dark:text-amber-300 border-amber-500/30 bg-amber-500/10' },
+  'save-failed': { label: 'Save failed', className: 'text-red-700 dark:text-red-300 border-red-500/30 bg-red-500/10' },
+  'upload-failed': { label: 'Upload failed', className: 'text-red-700 dark:text-red-300 border-red-500/30 bg-red-500/10' },
+  conflict: { label: 'Conflict', className: 'text-red-700 dark:text-red-300 border-red-500/30 bg-red-500/10' },
 }
 
 export function EditorToolbar({

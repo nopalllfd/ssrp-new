@@ -14,16 +14,23 @@ import {
   Search,
   Sparkles,
   Trash2,
+  UserPlus,
+  Users,
   User as UserIcon,
 } from 'lucide-react'
 import {
+  addProjectMember,
   createProject,
   deleteProjectForever,
   getProjectState,
+  listProjectMembers,
   listProjects,
+  removeProjectMember,
   renameProject,
   restoreProject,
+  searchUsers,
   softDeleteProject,
+  type ProjectMemberRow,
   type ProjectRow,
 } from '@/lib/api'
 import { parseDocument } from '@/lib/editorDocument'
@@ -35,7 +42,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Dialog, DialogContent } from '@/components/ui/dialog'
 import { Dropdown, DropdownItem } from '@/components/ui/dropdown'
-import { Select, Skeleton, Toggle } from '@/components/ui/misc'
+import { Label, Select, Skeleton, ThemeToggle, Toggle } from '@/components/ui/misc'
 import { formatDateTime } from '@/lib/utils'
 
 type SortKey = 'updated' | 'name' | 'created'
@@ -55,6 +62,7 @@ export function DashboardPage() {
   const [renaming, setRenaming] = useState<ProjectRow | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [deleting, setDeleting] = useState<ProjectRow | null>(null)
+  const [membersProject, setMembersProject] = useState<ProjectRow | null>(null)
 
   const projectsQuery = useQuery({
     queryKey: ['projects', showTrash],
@@ -107,6 +115,26 @@ export function DashboardPage() {
     onSuccess: invalidate,
   })
 
+  const membersQuery = useQuery({
+    queryKey: ['project-members', membersProject?.id],
+    queryFn: () => listProjectMembers(membersProject!.id),
+    enabled: !!membersProject,
+  })
+
+  const addMemberMutation = useMutation({
+    mutationFn: (userId: string) =>
+      addProjectMember(membersProject!.id, userId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['project-members', membersProject?.id] }),
+  })
+
+  const removeMemberMutation = useMutation({
+    mutationFn: (userId: string) =>
+      removeProjectMember(membersProject!.id, userId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({ queryKey: ['project-members', membersProject?.id] }),
+  })
+
   const visible = useMemo(() => {
     const rows = projectsQuery.data ?? []
     const filtered = search.trim()
@@ -139,6 +167,7 @@ export function DashboardPage() {
           </span>
         </div>
         <div className="flex items-center gap-1 sm:gap-2">
+          <ThemeToggle />
           <a
             href="https://bagibagi.co/floppp"
             target="_blank"
@@ -264,6 +293,7 @@ export function DashboardPage() {
               onDelete={() => setDeleting(p)}
               onRestore={() => restoreMutation.mutate(p.id)}
               onPurge={() => purgeMutation.mutate(p.id)}
+              onMembers={() => setMembersProject(p)}
             />
           ))}
         </div>
@@ -299,6 +329,7 @@ export function DashboardPage() {
                 onDelete={() => setDeleting(p)}
                 onRestore={() => restoreMutation.mutate(p.id)}
                 onPurge={() => purgeMutation.mutate(p.id)}
+                onMembers={() => setMembersProject(p)}
               />
             </div>
           ))}
@@ -379,6 +410,191 @@ export function DashboardPage() {
           </div>
         </DialogContent>
       </Dialog>
+      {/* Anggota project */}
+      <Dialog open={!!membersProject} onOpenChange={() => setMembersProject(null)}>
+        <DialogContent
+          title={membersProject ? `Anggota — ${membersProject.name}` : 'Anggota'}
+          onClose={() => setMembersProject(null)}
+        >
+          <MembersPanel
+            members={membersQuery.data ?? []}
+            loading={membersQuery.isLoading}
+            adding={addMemberMutation.isPending}
+            removing={removeMemberMutation.isPending}
+            error={
+              (membersQuery.error as Error | null)?.message ??
+              (addMemberMutation.error as Error | null)?.message ??
+              null
+            }
+            onAdd={(userId) => addMemberMutation.mutate(userId)}
+            onRemove={(userId) => removeMemberMutation.mutate(userId)}
+          />
+        </DialogContent>
+      </Dialog>
+    </div>
+  )
+}
+
+/**
+ * Panel anggota: daftar anggota + pencarian user untuk mengundang.
+ * Pencarian memakai nama tampilan profil (e-mail tidak tersedia di sisi klien).
+ */
+function MembersPanel(props: {
+  members: ProjectMemberRow[]
+  loading: boolean
+  adding: boolean
+  removing: boolean
+  error: string | null
+  onAdd: (userId: string) => void
+  onRemove: (userId: string) => void
+}) {
+  const { user } = useAuth()
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<
+    { id: string; display_name: string | null; avatar_url: string | null }[]
+  >([])
+  const [searching, setSearching] = useState(false)
+  const [searchError, setSearchError] = useState<string | null>(null)
+
+  const memberIds = new Set(props.members.map((m) => m.user_id))
+
+  async function runSearch(e: React.FormEvent) {
+    e.preventDefault()
+    const q = query.trim()
+    if (!q) return
+    setSearching(true)
+    setSearchError(null)
+    try {
+      setResults(await searchUsers(q))
+    } catch (err) {
+      setSearchError((err as Error).message)
+      setResults([])
+    } finally {
+      setSearching(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs font-medium text-muted-foreground">
+            {props.loading
+              ? 'Memuat anggota…'
+              : `${props.members.length} anggota`}
+          </p>
+        </div>
+        {props.loading && <Skeleton className="h-12" />}
+        {!props.loading && props.members.length === 0 && (
+          <p className="rounded-md border border-dashed border-border p-3 text-xs text-muted-foreground">
+            Belum ada anggota. Undang orang lewat pencarian di bawah.
+          </p>
+        )}
+        <ul className="flex flex-col gap-1">
+          {props.members.map((m) => (
+            <li
+              key={m.user_id}
+              className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-2"
+            >
+              <div className="flex min-w-0 items-center gap-2">
+                {m.profile?.avatar_url ? (
+                  <img
+                    src={m.profile.avatar_url}
+                    alt=""
+                    className="size-7 shrink-0 rounded-full"
+                    referrerPolicy="no-referrer"
+                  />
+                ) : (
+                  <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-secondary">
+                    <UserIcon className="size-4" />
+                  </span>
+                )}
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {m.profile?.display_name ?? 'User'}
+                  </p>
+                  <p className="text-[10px] uppercase tracking-wide text-muted-foreground">
+                    {m.role === 'owner' ? 'Owner' : 'Collaborator'}
+                    {user?.id === m.user_id ? ' · Anda' : ''}
+                  </p>
+                </div>
+              </div>
+              {m.role !== 'owner' && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label={`Hapus ${m.profile?.display_name ?? 'anggota'}`}
+                  disabled={props.removing}
+                  onClick={() => props.onRemove(m.user_id)}
+                >
+                  <Trash2 />
+                </Button>
+              )}
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <form onSubmit={runSearch} className="flex flex-col gap-2">
+        <Label htmlFor="member-search">Tambah orang</Label>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
+            <Search className="pointer-events-none absolute top-2.5 left-2.5 size-4 text-muted-foreground" />
+            <Input
+              id="member-search"
+              className="pl-8"
+              placeholder="Cari nama user…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
+          <Button type="submit" variant="outline" disabled={searching || !query.trim()}>
+            <UserPlus /> Cari
+          </Button>
+        </div>
+        {searchError && <p className="text-xs text-destructive">{searchError}</p>}
+        {results.length > 0 && (
+          <ul className="flex flex-col gap-1">
+            {results.map((r) => {
+              const already = memberIds.has(r.id)
+              return (
+                <li
+                  key={r.id}
+                  className="flex items-center justify-between gap-2 rounded-md border border-border px-3 py-1.5"
+                >
+                  <div className="flex min-w-0 items-center gap-2">
+                    {r.avatar_url ? (
+                      <img
+                        src={r.avatar_url}
+                        alt=""
+                        className="size-6 shrink-0 rounded-full"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : (
+                      <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-secondary">
+                        <UserIcon className="size-3.5" />
+                      </span>
+                    )}
+                    <p className="truncate text-sm">{r.display_name ?? 'User'}</p>
+                  </div>
+                  <Button
+                    size="sm"
+                    disabled={already || props.adding}
+                    onClick={() => props.onAdd(r.id)}
+                  >
+                    {already ? 'Sudah ada' : 'Tambah'}
+                  </Button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
+        {!searching && query.trim() && results.length === 0 && !searchError && (
+          <p className="text-xs text-muted-foreground">Tidak ada user cocok.</p>
+        )}
+      </form>
+
+      {props.error && <p className="text-xs text-destructive">{props.error}</p>}
     </div>
   )
 }
@@ -456,6 +672,7 @@ function ProjectCard(props: {
   onDelete: () => void
   onRestore: () => void
   onPurge: () => void
+  onMembers: () => void
 }) {
   const { project, trashed, onOpen } = props
   const { url: thumbUrl, onImgError } = useProjectThumbnail(project.id, !trashed)
@@ -503,6 +720,7 @@ function ProjectMenu(props: {
   onDelete: () => void
   onRestore: () => void
   onPurge: () => void
+  onMembers: () => void
 }) {
   if (props.trashed) {
     return (
@@ -518,15 +736,18 @@ function ProjectMenu(props: {
   }
   return (
     <Dropdown align="right" trigger={<Button variant="ghost" size="icon"><MoreHorizontal /></Button>}>
-      <DropdownItem onClick={props.onRename}>
-        <Pencil /> Rename
-      </DropdownItem>
-      <DropdownItem onClick={props.onDuplicate}>
-        <Copy /> Duplicate
-      </DropdownItem>
-      <DropdownItem destructive onClick={props.onDelete}>
-        <Trash2 /> Move to trash
-      </DropdownItem>
-    </Dropdown>
+        <DropdownItem onClick={props.onMembers}>
+          <Users /> Anggota
+        </DropdownItem>
+        <DropdownItem onClick={props.onRename}>
+          <Pencil /> Rename
+        </DropdownItem>
+        <DropdownItem onClick={props.onDuplicate}>
+          <Copy /> Duplicate
+        </DropdownItem>
+        <DropdownItem destructive onClick={props.onDelete}>
+          <Trash2 /> Move to trash
+        </DropdownItem>
+      </Dropdown>
   )
 }

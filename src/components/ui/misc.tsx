@@ -1,5 +1,7 @@
 import { forwardRef, type InputHTMLAttributes, type LabelHTMLAttributes, type SelectHTMLAttributes, type TextareaHTMLAttributes } from 'react'
+import { Moon, Sun } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { useTheme } from '@/store/theme'
 import logoUrl from '@/assets/logo.svg'
 
 export const Label = forwardRef<HTMLLabelElement, LabelHTMLAttributes<HTMLLabelElement>>(
@@ -20,12 +22,19 @@ export const Select = forwardRef<HTMLSelectElement, SelectHTMLAttributes<HTMLSel
       <select
         ref={ref}
         className={cn(
-          'flex h-9 w-full cursor-pointer rounded-md border border-input bg-card px-2 text-sm text-card-foreground',
-          'focus-visible:outline-2 focus-visible:outline-ring disabled:cursor-not-allowed disabled:opacity-50',
-          // Opsi native perlu latar eksplisit supaya dropdown kontras di tema gelap.
-          '[&>option]:bg-card [&>option]:text-card-foreground',
+          'flex h-9 w-full cursor-pointer items-center justify-between gap-2 rounded-md border border-input bg-card px-3 text-sm text-card-foreground shadow-sm transition-colors',
+          'hover:border-ring/50',
+          'focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-ring',
+          'disabled:cursor-not-allowed disabled:opacity-50',
+          // Panah dropdown digambar via background SVG (theme-aware) karena
+          // appearance:none menyembunyikan panah native browser.
+          "pr-8 bg-no-repeat [background-position:right_0.5rem_center] [background-size:1rem]",
           className,
         )}
+        style={{
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23777' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m4 6 4 4 4-4'/%3E%3C/svg%3E\")",
+        }}
         {...props}
       >
         {children}
@@ -40,8 +49,11 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaHTMLAttributes<H
       <textarea
         ref={ref}
         className={cn(
-          'flex min-h-20 w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm',
-          'placeholder:text-muted-foreground focus-visible:outline-2 focus-visible:outline-ring',
+          'flex min-h-20 w-full rounded-md border border-input bg-card px-3 py-2 text-sm text-card-foreground transition-colors',
+          'placeholder:text-muted-foreground/70',
+          'hover:border-ring/50',
+          'focus-visible:border-ring focus-visible:outline-2 focus-visible:outline-ring',
+          'disabled:cursor-not-allowed disabled:opacity-50',
           className,
         )}
         {...props}
@@ -57,9 +69,30 @@ export function Slider({
   return (
     <input
       type="range"
-      className={cn('h-1.5 w-full cursor-pointer accent-white', className)}
+      className={cn('h-3.5 w-full cursor-pointer', className)}
       {...props}
     />
+  )
+}
+
+/** Tombol beralih tema terang/gelap — ikon menyesuaikan tema aktif. */
+export function ThemeToggle({ className }: { className?: string }) {
+  const { theme, toggleTheme } = useTheme()
+  return (
+    <button
+      type="button"
+      onClick={toggleTheme}
+      aria-label={theme === 'dark' ? 'Beralih ke tema terang' : 'Beralih ke tema gelap'}
+      title={theme === 'dark' ? 'Tema terang' : 'Tema gelap'}
+      className={cn(
+        'flex size-9 cursor-pointer items-center justify-center rounded-md text-muted-foreground transition-colors',
+        'hover:bg-accent hover:text-accent-foreground',
+        'focus-visible:outline-2 focus-visible:outline-ring',
+        className,
+      )}
+    >
+      {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+    </button>
   )
 }
 

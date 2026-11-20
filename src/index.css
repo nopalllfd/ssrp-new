@@ -1,24 +1,29 @@
 @import "tailwindcss";
 
+/* dark: berbasis class .dark di <html>, bukan prefers-color-scheme,
+   supaya pengguna bisa memilih tema lewat toggle. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* Token terang = nilai bawaan. Token gelap di-override di .dark. */
 @theme {
-  --color-background: oklch(0.145 0 0);
-  --color-foreground: oklch(0.985 0 0);
-  --color-card: oklch(0.205 0 0);
-  --color-card-foreground: oklch(0.985 0 0);
-  --color-popover: oklch(0.205 0 0);
-  --color-popover-foreground: oklch(0.985 0 0);
-  --color-primary: oklch(0.922 0 0);
-  --color-primary-foreground: oklch(0.205 0 0);
-  --color-secondary: oklch(0.269 0 0);
-  --color-secondary-foreground: oklch(0.985 0 0);
-  --color-muted: oklch(0.269 0 0);
-  --color-muted-foreground: oklch(0.708 0 0);
-  --color-accent: oklch(0.269 0 0);
-  --color-accent-foreground: oklch(0.985 0 0);
-  --color-destructive: oklch(0.704 0.191 22.216);
-  --color-border: oklch(1 0 0 / 10%);
-  --color-input: oklch(1 0 0 / 15%);
-  --color-ring: oklch(0.556 0 0);
+  --color-background: oklch(0.974 0 0);
+  --color-foreground: oklch(0.205 0 0);
+  --color-card: oklch(1 0 0);
+  --color-card-foreground: oklch(0.205 0 0);
+  --color-popover: oklch(1 0 0);
+  --color-popover-foreground: oklch(0.205 0 0);
+  --color-primary: oklch(0.269 0 0);
+  --color-primary-foreground: oklch(0.985 0 0);
+  --color-secondary: oklch(0.94 0 0);
+  --color-secondary-foreground: oklch(0.269 0 0);
+  --color-muted: oklch(0.94 0 0);
+  --color-muted-foreground: oklch(0.449 0 0);
+  --color-accent: oklch(0.92 0 0);
+  --color-accent-foreground: oklch(0.205 0 0);
+  --color-destructive: oklch(0.571 0.211 27.294);
+  --color-border: oklch(0 0 0 / 10%);
+  --color-input: oklch(0 0 0 / 12%);
+  --color-ring: oklch(0.205 0 0);
   --radius-sm: 0.375rem;
   --radius-md: 0.5rem;
   --radius-lg: 0.625rem;
@@ -59,6 +64,28 @@
   }
 }
 
+/* Override token untuk tema gelap (class .dark di <html>). */
+.dark {
+  --color-background: oklch(0.145 0 0);
+  --color-foreground: oklch(0.985 0 0);
+  --color-card: oklch(0.205 0 0);
+  --color-card-foreground: oklch(0.985 0 0);
+  --color-popover: oklch(0.205 0 0);
+  --color-popover-foreground: oklch(0.985 0 0);
+  --color-primary: oklch(0.922 0 0);
+  --color-primary-foreground: oklch(0.205 0 0);
+  --color-secondary: oklch(0.269 0 0);
+  --color-secondary-foreground: oklch(0.985 0 0);
+  --color-muted: oklch(0.269 0 0);
+  --color-muted-foreground: oklch(0.708 0 0);
+  --color-accent: oklch(0.269 0 0);
+  --color-accent-foreground: oklch(0.985 0 0);
+  --color-destructive: oklch(0.704 0.191 22.216);
+  --color-border: oklch(1 0 0 / 10%);
+  --color-input: oklch(1 0 0 / 15%);
+  --color-ring: oklch(0.556 0 0);
+}
+
 html,
 body,
 #root {
@@ -71,28 +98,112 @@ body {
   font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
     "Helvetica Neue", Arial, sans-serif;
   -webkit-font-smoothing: antialiased;
+  /* Hilangkan highlight sentuh biru ala browser mobile. */
+  -webkit-tap-highlight-color: transparent;
 }
 
 .konvajs-content {
   outline: none;
 }
 
-/* Scrollbar tipis bergaya tema — dipakai area gulir di dalam modal/panel. */
-.app-scrollbar {
+/* Scrollbar tipis bergaya tema — berlaku global untuk semua area gulir. */
+* {
   scrollbar-width: thin;
   scrollbar-color: var(--color-ring) transparent;
 }
-.app-scrollbar::-webkit-scrollbar {
+*::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
-.app-scrollbar::-webkit-scrollbar-track {
+*::-webkit-scrollbar-track {
   background: transparent;
 }
-.app-scrollbar::-webkit-scrollbar-thumb {
+*::-webkit-scrollbar-thumb {
   background-color: var(--color-ring);
   border-radius: 9999px;
 }
-.app-scrollbar::-webkit-scrollbar-thumb:hover {
+*::-webkit-scrollbar-thumb:hover {
   background-color: var(--color-muted-foreground);
+}
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* Hilangkan panah spinner number input ala browser. */
+input[type="number"]::-webkit-outer-spin-button,
+input[type="number"]::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+/* Slider range: track & thumb digambar manual supaya tidak memakai
+   styling default browser (berbeda antar Chrome/Firefox/Safari). */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--color-muted);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  margin-top: -5px;
+  height: 14px;
+  width: 14px;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  border: 2px solid var(--color-background);
+  box-shadow: 0 0 0 1px var(--color-border);
+  transition: transform 0.1s ease;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+}
+input[type="range"]::-moz-range-track {
+  height: 4px;
+  border-radius: 9999px;
+  background: var(--color-muted);
+}
+input[type="range"]::-moz-range-thumb {
+  height: 14px;
+  width: 14px;
+  border-radius: 9999px;
+  background: var(--color-primary);
+  border: 2px solid var(--color-background);
+  box-shadow: 0 0 0 1px var(--color-border);
+}
+input[type="range"]:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
+  border-radius: 9999px;
+}
+
+/* Select native: sembunyikan panah bawaan browser (panah custom via
+   wrapper di komponen Select) supaya tidak gaya "jadul" per-browser. */
+select {
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+}
+select option {
+  background-color: var(--color-popover);
+  color: var(--color-popover-foreground);
+}
+
+/* Hilangkan ikon clear/search bawaan browser pada input. */
+input::-webkit-search-decoration,
+input::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+}
+input::-ms-clear {
+  display: none;
 }

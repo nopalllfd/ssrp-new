@@ -254,7 +254,7 @@ function SnippetBox({ label, value }: { label: string; value: string }) {
           onClick={() => void copy()}
           className="inline-flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground hover:text-foreground"
         >
-          {copied ? <Check className="size-3 text-emerald-400" /> : <Copy className="size-3" />}
+          {copied ? <Check className="size-3 text-emerald-700 dark:text-emerald-400" /> : <Copy className="size-3" />}
           {copied ? 'Copied' : 'Copy'}
         </button>
       </div>

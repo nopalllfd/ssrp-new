@@ -155,10 +155,10 @@ export function ApplyChatlogDialog({
             <p className="mt-1 text-xs text-muted-foreground">
               {lines.length} kalimat → {imageCount} gambar
               {leftover > 0 && (
-                <span className="text-amber-400"> · {leftover} kalimat sisa diabaikan</span>
+                <span className="text-amber-700 dark:text-amber-400"> · {leftover} kalimat sisa diabaikan</span>
               )}
               {perImage > 0 && lines.length < capacity && (
-                <span className="text-amber-400">
+                <span className="text-amber-700 dark:text-amber-400">
                   {' '}
                   · {imageCount - Math.ceil(lines.length / perImage)} gambar tanpa kalimat
                 </span>
