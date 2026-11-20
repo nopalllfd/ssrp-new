@@ -352,11 +352,19 @@ export function EditorCanvas({ width, height }: { width: number; height: number 
       onWheel={onWheel}
       onClick={onStageClick}
       onTap={onStageClick}
-      onDragEnd={(e) => {
+      onDragMove={(e) => {
+        // Sinkronkan stagePos SELAMA stage bergerak (bukan hanya di akhir).
+        // Tanpa ini, mask tepi canvas & overlay edit memakai stagePos lama →
+        // gambar seolah tak bergeser dan area crop "sekilas lalu hilang".
         if (e.target === stageRef.current) {
           setStagePos({ x: e.target.x(), y: e.target.y() })
         }
       }}
+      onDragEnd={(e) => {
+          if (e.target === stageRef.current) {
+            setStagePos({ x: e.target.x(), y: e.target.y() })
+          }
+        }}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
       // touch-action none: serahkan gesture sentuh penuh ke Konva agar
