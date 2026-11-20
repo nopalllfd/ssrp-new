@@ -1,5 +1,6 @@
 import { useState } from 'react'
-import { Images, RotateCcw } from 'lucide-react'
+import { ChevronDown, Images, RotateCcw } from 'lucide-react'
+import { cn } from '@/lib/utils'
 import { applyTextStyleToAllImages, useEditorStore } from '@/store/editor'
 import { effectiveCrop, refitImageLayers } from '@/lib/editorDocument'
 import { refitChatlogLayers } from '@/lib/chatlog'
@@ -9,6 +10,18 @@ import { Label, Select, Slider, Textarea, Toggle } from '@/components/ui/misc'
 import { FONT_OPTIONS } from '@/lib/fonts'
 import type { Layer, TextLayer, TextStyleOverride } from '@/types/editor'
 import { applyStyleRange, shiftStyleRanges, styleAt } from '@/lib/richText'
+
+/** Template ukuran canvas yang siap dipakai untuk panel Canvas. */
+const CANVAS_SIZE_TEMPLATES: { label: string; width: number; height: number }[] = [
+  { label: 'Instagram Post', width: 1080, height: 1080 },
+  { label: 'Instagram Story', width: 1080, height: 1920 },
+  { label: 'X / Twitter Post', width: 1200, height: 675 },
+  { label: 'Full HD (16:9)', width: 1920, height: 1080 },
+  { label: 'HD (16:9)', width: 1280, height: 720 },
+  { label: 'SA-MP Native (4:3)', width: 1280, height: 960 },
+  { label: '4:3', width: 1600, height: 1200 },
+  { label: 'Instagram Portrait (4:5)', width: 1080, height: 1350 },
+]
 
 export function PropertiesPanel() {
   const document = useEditorStore((s) => s.document)
@@ -23,6 +36,8 @@ export function PropertiesPanel() {
     }, { coalesce })
 
   const first = document.layers.find((l) => l.id === selection[0])
+  // Daftar template ukuran canvas di-collapse agar panel tidak penuh.
+  const [templateOpen, setTemplateOpen] = useState(false)
   // Text berukuran tetap (otomatis mengikuti konten) — hanya posisinya
   // yang diubah, tanpa kontrol width/height.
   const allTextSelected =
@@ -59,6 +74,51 @@ export function PropertiesPanel() {
               }, { coalesce: true })
             }
           />
+        </div>
+        <div className="rounded-md border border-border">
+          <button
+            type="button"
+            onClick={() => setTemplateOpen((v) => !v)}
+            aria-expanded={templateOpen}
+            className="flex w-full cursor-pointer items-center justify-between gap-2 px-2.5 py-2 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+          >
+            Template ukuran
+            <ChevronDown
+              className={cn('size-3.5 transition-transform', templateOpen && 'rotate-180')}
+            />
+          </button>
+          {templateOpen && (
+            <div className="grid grid-cols-2 gap-1.5 border-t border-border p-2">
+              {CANVAS_SIZE_TEMPLATES.map((t) => {
+                const active =
+                  document.canvas.width === t.width && document.canvas.height === t.height
+                return (
+                  <button
+                    key={t.label}
+                    type="button"
+                    onClick={() =>
+                      mutate((doc) => {
+                        doc.canvas.width = t.width
+                        doc.canvas.height = t.height
+                        refitChatlogLayers(doc)
+                      })
+                    }
+                    className={cn(
+                      'flex cursor-pointer flex-col items-start gap-0.5 rounded-md border px-2 py-1.5 text-left transition-colors',
+                      active
+                        ? 'border-primary bg-primary/10'
+                        : 'border-border hover:border-ring/60 hover:bg-accent',
+                    )}
+                  >
+                    <span className="text-[11px] font-medium leading-tight">{t.label}</span>
+                    <span className="text-[10px] text-muted-foreground">
+                      {t.width}×{t.height}
+                    </span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
         <ColorField
           label="Background"
@@ -525,13 +585,22 @@ export function ColorField({
     <div>
       <Label>{label}</Label>
       <div className="mt-1 flex items-center gap-2">
-        <input
-          type="color"
-          aria-label={label}
-          className="h-9 w-10 cursor-pointer rounded-md border border-input bg-transparent"
-          value={normalizeColor(value)}
-          onChange={(e) => onChange(e.target.value)}
-        />
+        {/* Swatch kustom: input color native diletakkan transparan di atasnya,
+            jadi yang terlihat kotak bergaya design system, bukan bawaan browser. */}
+        <label className="relative h-9 w-10 shrink-0 cursor-pointer overflow-hidden rounded-md border border-input shadow-sm transition-colors hover:border-ring/60 focus-within:border-ring focus-within:outline-2 focus-within:outline-ring">
+          <span
+            aria-hidden
+            className="absolute inset-0"
+            style={{ backgroundColor: normalizeColor(value) }}
+          />
+          <input
+            type="color"
+            aria-label={label}
+            className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            value={normalizeColor(value)}
+            onChange={(e) => onChange(e.target.value)}
+          />
+        </label>
         <Input value={value} onChange={(e) => onChange(e.target.value)} />
       </div>
     </div>
